@@ -1,0 +1,15 @@
+bitmex==0.2.2
+marshmallow==3.6.1
+rethinkdb==2.4.7
+backtrader==1.9.76.123
+pandas==1.0.5
+matplotlib==3.3.0
+scikit-learn==0.23.1
+flask-restful==0.3.8
+flask-cors==3.0.8
+Flask-gzip==0.2
+forex-python==1.5
+hyperopt==0.2.4
+git+https://github.com/quantopian/pyfolio
+empyrical==0.5.3
+xlsxwriter==1.2.9

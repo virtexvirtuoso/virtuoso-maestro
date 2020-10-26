@@ -1,0 +1,55 @@
+version: "3.3"
+services:
+  filos-be:
+    build:
+      dockerfile: backend.Dockerfile
+      context: .
+    ports:
+      - 5050:5000
+    environment:
+      - CONFIG_FILE=filos-prd.yaml
+    depends_on:
+      - rethinkdb
+    entrypoint: bash
+    command: ./wait-for-it.sh rethinkdb:28015 -- python3 main/rest_api.py
+  filos-bitmex:
+    build:
+      dockerfile: backend.Dockerfile
+      context: .
+    environment:
+      - CONFIG_FILE=filos-prd.yaml
+    depends_on:
+      - rethinkdb
+    entrypoint: bash
+    command: ./wait-for-it.sh rethinkdb:28015 -- python3 main/data_bitmex_download.py
+  filos-binance:
+    build:
+      dockerfile: backend.Dockerfile
+      context: .
+    environment:
+      - CONFIG_FILE=filos-prd.yaml
+    depends_on:
+      - rethinkdb
+    entrypoint: bash
+    command: ./wait-for-it.sh rethinkdb:28015 -- python3 main/data_binance_download.py
+  filos-fe:
+    build:
+      dockerfile: frontend.Dockerfile
+      context: .
+    ports:
+      - 8080:5000
+    depends_on:
+      - filos-be
+    entrypoint: bash
+    command: ./wait-for-it.sh filos-be:5050 -- serve -s build
+  rethinkdb:
+    image: rethinkdb
+    ports:
+      - 8081:8080
+      - 28015:28015
+    volumes:
+      - db-data:/data
+    command: rethinkdb --bind all
+
+volumes:
+  db-data:
