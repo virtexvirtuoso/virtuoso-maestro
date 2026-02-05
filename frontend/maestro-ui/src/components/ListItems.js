@@ -1,67 +1,38 @@
-import React, {Component} from 'react';
-import ListItem from '@material-ui/core/ListItem';
-import ListItemIcon from '@material-ui/core/ListItemIcon';
-import ListItemText from '@material-ui/core/ListItemText';
-import DashboardIcon from '@material-ui/icons/Dashboard';
-import AssessmentIcon from '@material-ui/icons/Assessment';
-import TrendingUpIcon from '@material-ui/icons/TrendingUp';
-import {withRouter} from "react-router-dom";
-import List from "@material-ui/core/List";
+import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import AssessmentIcon from '@mui/icons-material/Assessment';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
-class MainListItems extends Component {
+export default function MainListItems() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const currentPath = '/' + location.pathname.split('/')[1];
 
-    constructor(props) {
-        super(props);
-        this.state = {
-            selected: '/'
-        }
-    }
+  const menuItems = [
+    { path: '/', label: 'Home', icon: <DashboardIcon /> },
+    { path: '/results', label: 'Results', icon: <AssessmentIcon /> },
+    { path: '/evaluate', label: 'Evaluation', icon: <TrendingUpIcon /> },
+  ];
 
-
-    updateSelected(path) {
-        this.props.history.push(path)
-        this.setState({selected: path})
-    }
-
-    componentDidUpdate(prevProps, prevState, snapshot) {
-        let path = "/" + this.props.location.pathname.split("/")[1];
-        if (path !== this.state.selected) {
-            this.setState({selected: path})
-        }
-    }
-
-    render() {
-        const selected  = this.state.selected;
-
-        return (
-            <List>
-                <ListItem button
-                          onClick={() => this.updateSelected('/')}
-                          selected={selected === '/'}>
-                    <ListItemIcon>
-                        <DashboardIcon />
-                    </ListItemIcon>
-                    <ListItemText primary="Home" />
-                </ListItem>
-                <ListItem button
-                          onClick={() => this.updateSelected('/results')}
-                          selected={selected === '/results'}>
-                    <ListItemIcon>
-                        <AssessmentIcon />
-                    </ListItemIcon>
-                    <ListItemText primary="Results" />
-                </ListItem>
-                <ListItem button
-                          onClick={() => this.updateSelected('/evaluate')}
-                          selected={selected === '/evaluate'}>
-                    <ListItemIcon>
-                        <TrendingUpIcon />
-                    </ListItemIcon>
-                    <ListItemText primary="Evaluation" />
-                </ListItem>
-            </List>
-        );
-    }
+  return (
+    <List>
+      {menuItems.map((item) => (
+        <ListItem key={item.path} disablePadding>
+          <ListItemButton
+            selected={currentPath === item.path}
+            onClick={() => navigate(item.path)}
+          >
+            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemText primary={item.label} />
+          </ListItemButton>
+        </ListItem>
+      ))}
+    </List>
+  );
 }
-
-export default withRouter(MainListItems);

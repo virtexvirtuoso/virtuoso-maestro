@@ -1,61 +1,42 @@
-import React, {Component} from 'react';
+import React, { useEffect, useState } from 'react';
+import { useTheme } from '@mui/material/styles';
 import Highcharts from 'highcharts/highstock';
-import HighchartsReact from "highcharts-react-official";
-import { withTheme } from '@material-ui/core/styles';
+import HighchartsReact from 'highcharts-react-official';
 
-class PnLChart extends Component {
+export default function PnLChart({ tid, data }) {
+  const theme = useTheme();
+  const [chart, setChart] = useState(null);
 
-    constructor(props) {
-        super(props);
-        this.state = {
-            chart: null,
-        }
-    }
+  useEffect(() => {
+    if (!data) return;
 
-    componentDidUpdate(prevProps, prevState, snapshot) {
-        if (prevProps.tid !== this.props.tid){
-            this.componentDidMount();
-        }
-    }
+    const options = {
+      chart: {
+        type: 'line',
+      },
+      title: null,
+      subTitle: null,
+      xAxis: {
+        title: {
+          text: 'Trade',
+        },
+      },
+      yAxis: {
+        title: {
+          text: 'PNL',
+        },
+      },
+      series: [
+        {
+          name: 'Pnl',
+          color: theme.palette.secondary.light,
+          data: data,
+        },
+      ],
+    };
 
-    componentDidMount() {
-        let pnl_history = this.props.data;
+    setChart(<HighchartsReact highcharts={Highcharts} options={options} />);
+  }, [tid, data, theme.palette.secondary.light]);
 
-        const options = {
-            chart: {
-                type: 'line',
-            },
-            title: null,
-            subTitle: null,
-            xAxis: {
-                title: {
-                    text: 'Trade'
-                },
-            },
-            yAxis: {
-                title: {
-                    text: 'PNL'
-                },
-            },
-            series: [{
-                name: 'Pnl',
-                color: this.props.theme.palette.secondary.light,
-                data: pnl_history
-            }]};
-
-        this.setState({chart: (<HighchartsReact
-                highcharts={ Highcharts }
-                options = { options }
-            />)});
-    }
-
-    render() {
-        return (
-            <React.Fragment>
-                {this.state.chart}
-            </React.Fragment>
-        );
-    }
+  return <React.Fragment>{chart}</React.Fragment>;
 }
-
-export default withTheme(PnLChart);
