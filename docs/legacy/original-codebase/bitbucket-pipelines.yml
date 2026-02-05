@@ -1,0 +1,31 @@
+pipelines:
+  default:
+    - step:
+        name: "Start Pipeline Notification"
+        script:
+          - pipe: atlassian/slack-notify:0.3.6
+            variables:
+              WEBHOOK_URL: $WEBHOOK_URL
+              MESSAGE: 'Starting Building new Filos version...'
+    - step:
+        name: 'Build & Deploy'
+        deployment: 'filos-server-dev'
+        script:
+          - pipe: atlassian/ssh-run:0.2.6
+            variables:
+              SSH_USER: 'filos'
+              SERVER: '209.250.250.102'
+              MODE: "script"
+              COMMAND: 'deploy.sh'
+    - step:
+        name: "End Pipeline Notification"
+        script:
+          - pipe: atlassian/slack-notify:0.3.6
+            variables:
+              WEBHOOK_URL: $WEBHOOK_URL
+              MESSAGE: 'New Filos version is available at: http://209.250.250.102:8080'
+
+definitions:
+  services:
+    docker:
+      memory: 2048

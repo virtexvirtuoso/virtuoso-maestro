@@ -1,0 +1,45 @@
+config:
+  rethinkdb:
+    host: 127.0.01
+    port: 28015
+    db: filos-dev
+  datasource:
+    bitmex:
+      symbols:
+        xbtusd:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+    binance:
+      symbols:
+        ethbtc:
+          bin_size:
+            - 1d
+        ltcbtc:
+          bin_size:
+            - 1d
+        zecbtc:
+          bin_size:
+            - 1d
+        chzbtc:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+        iostbtc:
+          bin_size:
+            - 1d
+  restapi:
+    host: 127.0.0.1
+    port: 5000
+    debug: true
+  optimization:
+    output:
+      results: optimization_results
+      progress:  optimization_progress
+    kind:
+      walkforward:
+        num_splits: 10

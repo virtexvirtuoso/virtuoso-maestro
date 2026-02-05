@@ -1,0 +1,87 @@
+config:
+  rethinkdb:
+    host: rethinkdb
+    port: 28015
+    db: filos-prd
+  datasource:
+    bitmex:
+      symbols:
+        xbtusd:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+        ethusd:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+    binance:
+      symbols:
+        ethbtc:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+        ltcbtc:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+        zecbtc:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+        bnbbtc:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+        xrpbtc:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+        eosbtc:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+        xmrbtc:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+        chzbtc:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+        linkbtc:
+          bin_size:
+            - 1m
+            - 5m
+            - 1h
+            - 1d
+  restapi:
+    host: 0.0.0.0
+    port: 5000
+    debug: true
+  optimization:
+    output:
+      results: optimization_results
+      progress:  optimization_progress
+    kind:
+      walkforward:
+        num_splits: 10
