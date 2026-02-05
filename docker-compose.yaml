@@ -1,11 +1,79 @@
 version: "3.8"
 services:
+  # Nginx reverse proxy - routes between V1 (Flask) and V2 (FastAPI)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - 80:80
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      maestro-api-v1:
+        condition: service_healthy
+      maestro-api-v2:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # Flask API (V1) - legacy API for backward compatibility
+  maestro-api-v1:
+    build:
+      dockerfile: backend.Dockerfile
+      context: .
+    expose:
+      - "5000"
+    ports:
+      - 5050:5000
+    environment:
+      - CONFIG_FILE=maestro-prd.yaml
+    depends_on:
+      rethinkdb:
+        condition: service_healthy
+    entrypoint: bash
+    command: ./wait-for-it.sh rethinkdb:28015 -- python3 main/rest_api.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/strategy/available"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # FastAPI (V2) - new async API with WebSocket support
+  maestro-api-v2:
+    build:
+      dockerfile: backend.Dockerfile
+      context: .
+    expose:
+      - "8000"
+    ports:
+      - 8000:8000
+    environment:
+      - CONFIG_FILE=maestro-prd.yaml
+    depends_on:
+      rethinkdb:
+        condition: service_healthy
+      questdb:
+        condition: service_healthy
+    entrypoint: bash
+    command: ./wait-for-it.sh rethinkdb:28015 -- python3 -m uvicorn main.fastapi_app:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v2/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Legacy alias for backward compatibility (points to V1)
   maestro-be:
     build:
       dockerfile: backend.Dockerfile
       context: .
     ports:
-      - 5050:5000
+      - 5051:5000
     environment:
       - CONFIG_FILE=maestro-prd.yaml
     depends_on:

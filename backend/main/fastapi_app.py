@@ -653,6 +653,7 @@ async def websocket_progress(websocket: WebSocket, tid: str):
 # ============================================================================
 
 @app.get("/health", tags=["System"])
+@app.get("/api/v2/health", tags=["System"])
 async def health_check():
     """Health check endpoint for load balancers"""
     return {
