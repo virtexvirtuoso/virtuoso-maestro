@@ -43,6 +43,8 @@ config:
     kind:
       walkforward:
         num_splits: 10
+        mode: rolling  # rolling | expanding | adaptive
+        volatility_window: 20  # For adaptive mode: days for rolling volatility
     parallel:
       enabled: true
       max_workers: null  # null = auto (cpu_count - 1)

@@ -39,7 +39,7 @@ from engine_v2.walk_forward_optuna import (
     WalkForwardResult,
     OptimizationType,
 )
-from utils.time_series_split_rolling import TimeSeriesSplitRolling
+from utils.time_series_split_rolling import TimeSeriesSplitRolling, WindowMode
 
 
 @dataclass
@@ -302,11 +302,15 @@ class ParallelWalkForward:
 
         self.logger.info(
             f"Starting parallel walk-forward optimization with {self.config.num_splits} splits, "
-            f"max_workers={self.max_workers}"
+            f"max_workers={self.max_workers}, mode={self.config.mode}"
         )
 
-        # Initialize TimeSeriesSplitRolling
-        tscv = TimeSeriesSplitRolling(self.config.num_splits)
+        # Initialize TimeSeriesSplitRolling with mode (Phase 5.3)
+        tscv = TimeSeriesSplitRolling(
+            n_splits=self.config.num_splits,
+            mode=self.config.mode,
+            volatility_window=self.config.volatility_window,
+        )
 
         # Validate and adjust split configuration
         n_folds = self.config.num_splits + 1
@@ -320,13 +324,18 @@ class ParallelWalkForward:
                 f"test_splits={test_splits}"
             )
             self.config.num_splits = train_splits + test_splits
-            tscv = TimeSeriesSplitRolling(self.config.num_splits)
+            tscv = TimeSeriesSplitRolling(
+                n_splits=self.config.num_splits,
+                mode=self.config.mode,
+                volatility_window=self.config.volatility_window,
+            )
 
         splits = list(tscv.split(
             self.data,
             fixed_length=self.config.fixed_length,
             train_splits=self.config.train_splits,
-            test_splits=self.config.test_splits
+            test_splits=self.config.test_splits,
+            mode=self.config.mode,  # Pass mode to split
         ))
 
         self.total_folds = len(splits)

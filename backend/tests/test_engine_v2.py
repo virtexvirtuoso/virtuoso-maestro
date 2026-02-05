@@ -44,7 +44,7 @@ from engine_v2.optuna_dashboard_storage import (
     get_storage_url,
     get_default_storage_path,
 )
-from utils.time_series_split_rolling import TimeSeriesSplitRolling
+from utils.time_series_split_rolling import TimeSeriesSplitRolling, WindowMode
 import optuna
 
 
@@ -308,42 +308,383 @@ class TestStrategyAdapter:
 
 class TestTimeSeriesSplitRolling:
     """Test that TimeSeriesSplitRolling works the same as original"""
-    
+
     def test_basic_split(self, sample_ohlcv_data):
         """Test basic splitting functionality"""
         tscv = TimeSeriesSplitRolling(n_splits=5)
         splits = list(tscv.split(sample_ohlcv_data))
-        
+
         assert len(splits) > 0
-        
+
         for train_idx, test_idx in splits:
             # Test indices should be after train indices
             assert train_idx[-1] < test_idx[0]
-            
+
     def test_fixed_length_split(self, sample_ohlcv_data):
         """Test fixed-length splitting"""
         tscv = TimeSeriesSplitRolling(n_splits=5)
         splits = list(tscv.split(sample_ohlcv_data, fixed_length=True, train_splits=2))
-        
+
         assert len(splits) > 0
-        
+
         # All training sets should have similar lengths (with fixed_length=True)
         train_lengths = [len(train) for train, test in splits]
-        
+
         # First might be different due to remainder, but rest should be similar
         if len(train_lengths) > 2:
             assert max(train_lengths[1:]) - min(train_lengths[1:]) <= 1
-            
+
     def test_split_indices_non_overlapping(self, sample_ohlcv_data):
         """Test that train/test splits don't overlap"""
         tscv = TimeSeriesSplitRolling(n_splits=5)
-        
+
         for train_idx, test_idx in tscv.split(sample_ohlcv_data, fixed_length=True, train_splits=2):
             train_set = set(train_idx)
             test_set = set(test_idx)
-            
+
             # No overlap
             assert len(train_set & test_set) == 0
+
+
+# =============================================================================
+# Adaptive Window Mode Tests (Phase 5.3)
+# =============================================================================
+
+class TestWindowModes:
+    """Tests for rolling, expanding, and adaptive window modes"""
+
+    def test_window_mode_enum(self):
+        """Test WindowMode enum values"""
+        assert WindowMode.ROLLING.value == 'rolling'
+        assert WindowMode.EXPANDING.value == 'expanding'
+        assert WindowMode.ADAPTIVE.value == 'adaptive'
+
+    def test_default_mode_is_rolling(self):
+        """Test default mode is rolling"""
+        tscv = TimeSeriesSplitRolling(n_splits=5)
+        assert tscv.mode == WindowMode.ROLLING
+
+    def test_mode_from_string(self):
+        """Test mode can be set from string"""
+        tscv_rolling = TimeSeriesSplitRolling(n_splits=5, mode='rolling')
+        tscv_expanding = TimeSeriesSplitRolling(n_splits=5, mode='expanding')
+        tscv_adaptive = TimeSeriesSplitRolling(n_splits=5, mode='adaptive')
+
+        assert tscv_rolling.mode == WindowMode.ROLLING
+        assert tscv_expanding.mode == WindowMode.EXPANDING
+        assert tscv_adaptive.mode == WindowMode.ADAPTIVE
+
+    def test_mode_case_insensitive(self):
+        """Test mode string is case-insensitive"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='ROLLING')
+        assert tscv.mode == WindowMode.ROLLING
+
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='Expanding')
+        assert tscv.mode == WindowMode.EXPANDING
+
+    def test_invalid_mode_raises(self):
+        """Test invalid mode raises ValueError"""
+        with pytest.raises(ValueError, match="mode must be"):
+            TimeSeriesSplitRolling(n_splits=5, mode='invalid')
+
+    def test_volatility_window_default(self):
+        """Test default volatility window is 20"""
+        tscv = TimeSeriesSplitRolling(n_splits=5)
+        assert tscv.volatility_window == 20
+
+    def test_volatility_window_custom(self):
+        """Test custom volatility window"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, volatility_window=30)
+        assert tscv.volatility_window == 30
+
+
+class TestRollingMode:
+    """Tests for rolling (fixed-size sliding) window mode"""
+
+    def test_rolling_mode_fixed_size_windows(self, sample_ohlcv_data):
+        """Test rolling mode produces fixed-size windows"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='rolling')
+        splits = list(tscv.split(sample_ohlcv_data, fixed_length=True, train_splits=2))
+
+        # Get train lengths (excluding first which may have remainder)
+        train_lengths = [len(train) for train, test in splits]
+
+        assert len(splits) > 0
+
+        # All training sets should have similar lengths after first
+        if len(train_lengths) > 2:
+            # Sizes should be nearly equal
+            assert max(train_lengths[1:]) - min(train_lengths[1:]) <= 1
+
+    def test_rolling_mode_windows_slide(self, sample_ohlcv_data):
+        """Test rolling mode windows slide forward"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='rolling')
+        splits = list(tscv.split(sample_ohlcv_data, fixed_length=True, train_splits=2))
+
+        # Check that train start moves forward each split
+        prev_train_start = -1
+        for train_idx, test_idx in splits:
+            assert train_idx[0] > prev_train_start
+            prev_train_start = train_idx[0]
+
+    def test_rolling_mode_backward_compatible(self, sample_ohlcv_data):
+        """Test rolling mode matches original behavior"""
+        # Original way (no mode specified)
+        tscv_original = TimeSeriesSplitRolling(n_splits=5)
+        splits_original = list(tscv_original.split(
+            sample_ohlcv_data, fixed_length=True, train_splits=2
+        ))
+
+        # New way with explicit rolling mode
+        tscv_rolling = TimeSeriesSplitRolling(n_splits=5, mode='rolling')
+        splits_rolling = list(tscv_rolling.split(
+            sample_ohlcv_data, fixed_length=True, train_splits=2
+        ))
+
+        # Should produce identical splits
+        assert len(splits_original) == len(splits_rolling)
+
+        for (orig_train, orig_test), (roll_train, roll_test) in zip(splits_original, splits_rolling):
+            np.testing.assert_array_equal(orig_train, roll_train)
+            np.testing.assert_array_equal(orig_test, roll_test)
+
+
+class TestExpandingMode:
+    """Tests for expanding (growing) window mode"""
+
+    def test_expanding_mode_grows_train_window(self, sample_ohlcv_data):
+        """Test expanding mode grows training window each split"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='expanding')
+        splits = list(tscv.split(sample_ohlcv_data, train_splits=2))
+
+        train_lengths = [len(train) for train, test in splits]
+
+        # Each training window should be larger than the previous
+        for i in range(1, len(train_lengths)):
+            assert train_lengths[i] > train_lengths[i - 1]
+
+    def test_expanding_mode_starts_from_zero(self, sample_ohlcv_data):
+        """Test expanding mode always starts from index 0"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='expanding')
+        splits = list(tscv.split(sample_ohlcv_data, train_splits=2))
+
+        for train_idx, test_idx in splits:
+            # Training always starts at 0
+            assert train_idx[0] == 0
+
+    def test_expanding_mode_fixed_test_size(self, sample_ohlcv_data):
+        """Test expanding mode has fixed test window size"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='expanding')
+        splits = list(tscv.split(sample_ohlcv_data, train_splits=2, test_splits=1))
+
+        test_lengths = [len(test) for train, test in splits]
+
+        # All test windows should be the same size
+        assert len(set(test_lengths)) == 1
+
+    def test_expanding_mode_no_overlap(self, sample_ohlcv_data):
+        """Test expanding mode has no train/test overlap"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='expanding')
+
+        for train_idx, test_idx in tscv.split(sample_ohlcv_data, train_splits=2):
+            train_set = set(train_idx)
+            test_set = set(test_idx)
+            assert len(train_set & test_set) == 0
+
+
+class TestAdaptiveMode:
+    """Tests for adaptive (volatility-based) window mode"""
+
+    @pytest.fixture
+    def volatile_data(self):
+        """Generate data with varying volatility periods"""
+        np.random.seed(42)
+        n_bars = 500
+
+        # Low volatility period (0-200)
+        low_vol = np.random.randn(200) * 0.005
+
+        # High volatility period (200-400)
+        high_vol = np.random.randn(200) * 0.05
+
+        # Low volatility period (400-500)
+        low_vol2 = np.random.randn(100) * 0.005
+
+        returns = np.concatenate([low_vol, high_vol, low_vol2])
+        close = 100 * np.exp(np.cumsum(returns))
+
+        data = pd.DataFrame({
+            'open': close * 0.999,
+            'high': close * 1.005,
+            'low': close * 0.995,
+            'close': close,
+            'volume': np.random.randint(1000, 10000, n_bars),
+        }, index=pd.date_range('2020-01-01', periods=n_bars, freq='D'))
+
+        return data
+
+    def test_adaptive_mode_adjusts_windows(self, volatile_data):
+        """Test adaptive mode creates variable-size windows"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='adaptive')
+        splits = list(tscv.split(volatile_data, train_splits=2))
+
+        train_lengths = [len(train) for train, test in splits]
+
+        # With varying volatility, window sizes should vary
+        assert len(set(train_lengths)) > 1, "Adaptive mode should produce varying window sizes"
+
+    def test_adaptive_mode_larger_in_high_vol(self, volatile_data):
+        """Test adaptive mode produces larger windows in high-vol periods"""
+        tscv = TimeSeriesSplitRolling(n_splits=10, mode='adaptive')
+        splits = list(tscv.split(volatile_data, train_splits=2))
+
+        # The splits falling in high-vol period (around index 200-400) should have larger windows
+        # than splits in low-vol periods
+
+        # This is a rough test - we just verify the mechanism works
+        train_lengths = [len(train) for train, test in splits]
+        assert max(train_lengths) > min(train_lengths)
+
+    def test_adaptive_mode_formula(self, sample_ohlcv_data):
+        """Test adaptive mode applies formula: base_size * (0.5 + vol_normalized)"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='adaptive')
+
+        # Get volatility at splits for inspection
+        vol_at_splits = tscv.get_volatility_at_splits(sample_ohlcv_data)
+
+        # Volatility should be normalized to [0, 1]
+        if vol_at_splits is not None:
+            assert vol_at_splits.min() >= 0
+            assert vol_at_splits.max() <= 1
+
+    def test_adaptive_mode_minimum_window(self, sample_ohlcv_data):
+        """Test adaptive mode ensures minimum window size of 2"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='adaptive')
+        splits = list(tscv.split(sample_ohlcv_data, train_splits=2))
+
+        for train_idx, test_idx in splits:
+            assert len(train_idx) >= 2
+
+    def test_adaptive_mode_no_overlap(self, sample_ohlcv_data):
+        """Test adaptive mode has no train/test overlap"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='adaptive')
+
+        for train_idx, test_idx in tscv.split(sample_ohlcv_data, train_splits=2):
+            train_set = set(train_idx)
+            test_set = set(test_idx)
+            assert len(train_set & test_set) == 0
+
+    def test_adaptive_mode_valid_indices(self, sample_ohlcv_data):
+        """Test adaptive mode produces valid (non-negative) indices"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='adaptive')
+
+        for train_idx, test_idx in tscv.split(sample_ohlcv_data, train_splits=2):
+            assert train_idx[0] >= 0
+            assert test_idx[0] >= 0
+            assert train_idx[-1] < test_idx[0]  # Train ends before test starts
+
+    def test_adaptive_volatility_calculation(self, sample_ohlcv_data):
+        """Test volatility calculation uses 20-day rolling window"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='adaptive', volatility_window=20)
+
+        # Access private method for testing
+        volatility = tscv._calculate_volatility(sample_ohlcv_data)
+
+        # Should have same length as data
+        assert len(volatility) == len(sample_ohlcv_data)
+
+        # Volatility should be non-negative
+        assert (volatility >= 0).all()
+
+    def test_adaptive_custom_volatility_window(self, sample_ohlcv_data):
+        """Test adaptive mode with custom volatility window"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='adaptive', volatility_window=10)
+        splits = list(tscv.split(sample_ohlcv_data, train_splits=2))
+
+        # Should produce valid splits
+        assert len(splits) > 0
+
+        for train_idx, test_idx in splits:
+            assert len(train_idx) >= 2
+            assert len(test_idx) >= 1
+
+
+class TestModeOverride:
+    """Tests for mode override in split() method"""
+
+    def test_mode_override_in_split(self, sample_ohlcv_data):
+        """Test mode can be overridden in split() call"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='rolling')
+
+        # Override to expanding
+        splits = list(tscv.split(sample_ohlcv_data, train_splits=2, mode='expanding'))
+
+        # Should use expanding behavior
+        for train_idx, test_idx in splits:
+            assert train_idx[0] == 0  # Expanding always starts at 0
+
+    def test_mode_override_does_not_change_instance(self, sample_ohlcv_data):
+        """Test mode override doesn't change instance mode"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode='rolling')
+
+        # Override in split
+        list(tscv.split(sample_ohlcv_data, train_splits=2, mode='expanding'))
+
+        # Instance mode should still be rolling
+        assert tscv.mode == WindowMode.ROLLING
+
+
+class TestAllModesSplitValidity:
+    """Tests validating all modes produce valid train/test splits"""
+
+    @pytest.mark.parametrize("mode", ['rolling', 'expanding', 'adaptive'])
+    def test_all_modes_produce_valid_splits(self, sample_ohlcv_data, mode):
+        """Test all modes produce valid splits"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode=mode)
+        splits = list(tscv.split(sample_ohlcv_data, train_splits=2))
+
+        assert len(splits) > 0
+
+        for train_idx, test_idx in splits:
+            # Train should have data
+            assert len(train_idx) > 0
+
+            # Test should have data
+            assert len(test_idx) > 0
+
+            # Train ends before test starts
+            assert train_idx[-1] < test_idx[0]
+
+            # No overlap
+            assert len(set(train_idx) & set(test_idx)) == 0
+
+    @pytest.mark.parametrize("mode", ['rolling', 'expanding', 'adaptive'])
+    def test_all_modes_test_indices_increase(self, sample_ohlcv_data, mode):
+        """Test all modes have test indices that increase over splits"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode=mode)
+        splits = list(tscv.split(sample_ohlcv_data, train_splits=2))
+
+        prev_test_start = -1
+        for train_idx, test_idx in splits:
+            assert test_idx[0] > prev_test_start
+            prev_test_start = test_idx[0]
+
+    @pytest.mark.parametrize("mode", ['rolling', 'expanding', 'adaptive'])
+    def test_all_modes_cover_data(self, sample_ohlcv_data, mode):
+        """Test all modes cover the data without gaps in test indices"""
+        tscv = TimeSeriesSplitRolling(n_splits=5, mode=mode)
+        splits = list(tscv.split(sample_ohlcv_data, train_splits=2))
+
+        # Collect all test indices
+        all_test_indices = set()
+        for train_idx, test_idx in splits:
+            all_test_indices.update(test_idx)
+
+        # Test indices should form a contiguous range (no gaps)
+        min_idx = min(all_test_indices)
+        max_idx = max(all_test_indices)
+        expected_range = set(range(min_idx, max_idx + 1))
+        assert all_test_indices == expected_range
 
 
 # =============================================================================

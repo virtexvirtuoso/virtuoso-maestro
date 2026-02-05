@@ -38,7 +38,7 @@ from .strategy_adapter import SignalOutput, VectorBTStrategy
 from .vectorbt_engine import BacktestConfig, BacktestResult, VectorBTEngine, calculate_vwr
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.time_series_split_rolling import TimeSeriesSplitRolling
+from utils.time_series_split_rolling import TimeSeriesSplitRolling, WindowMode
 
 
 class OptimizationType(Enum):
@@ -55,6 +55,10 @@ class WalkForwardConfig:
     train_splits: int = 2  # Number of folds for training (rolling window)
     test_splits: int = 1   # Number of folds for testing
     fixed_length: bool = True  # Use fixed-length training windows
+
+    # Window mode settings (Phase 5.3)
+    mode: str = 'rolling'  # 'rolling' | 'expanding' | 'adaptive'
+    volatility_window: int = 20  # Rolling volatility window for adaptive mode
 
     # Optuna optimization settings
     n_trials: int = 100  # Number of Optuna trials per fold
@@ -196,10 +200,17 @@ class WalkForwardOptuna(Thread):
         self._running = True
         start_time = datetime.utcnow()
 
-        self.logger.info(f"Starting walk-forward optimization with {self.config.num_splits} splits")
+        self.logger.info(
+            f"Starting walk-forward optimization with {self.config.num_splits} splits, "
+            f"mode={self.config.mode}"
+        )
 
-        # Initialize TimeSeriesSplitRolling (same as original)
-        tscv = TimeSeriesSplitRolling(self.config.num_splits)
+        # Initialize TimeSeriesSplitRolling with mode (Phase 5.3)
+        tscv = TimeSeriesSplitRolling(
+            n_splits=self.config.num_splits,
+            mode=self.config.mode,
+            volatility_window=self.config.volatility_window,
+        )
 
         # Validate split configuration
         n_folds = self.config.num_splits + 1
@@ -214,13 +225,18 @@ class WalkForwardOptuna(Thread):
                 f"test_splits={test_splits}"
             )
             self.config.num_splits = train_splits + test_splits
-            tscv = TimeSeriesSplitRolling(self.config.num_splits)
+            tscv = TimeSeriesSplitRolling(
+                n_splits=self.config.num_splits,
+                mode=self.config.mode,
+                volatility_window=self.config.volatility_window,
+            )
 
         splits = list(tscv.split(
             self.data,
             fixed_length=self.config.fixed_length,
             train_splits=self.config.train_splits,
-            test_splits=self.config.test_splits
+            test_splits=self.config.test_splits,
+            mode=self.config.mode,  # Pass mode to split for consistency
         ))
 
         self.total_folds = len(splits)
