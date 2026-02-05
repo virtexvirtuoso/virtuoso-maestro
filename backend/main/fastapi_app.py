@@ -31,6 +31,8 @@ from pydantic import BaseModel, Field
 
 sys.path.insert(0, str(Path(__file__).parents[1].absolute()))
 
+import pandas as pd
+from analytics.quantstats_reporter import QuantStatsReporter
 from config.config_reader import ConfigReader, RethinkDbConfig
 from datafeed.data_adapter import get_adapter
 from datasource.providers import DataSourceProviders
@@ -646,6 +648,121 @@ async def websocket_progress(websocket: WebSocket, tid: str):
         pass
     finally:
         await manager.disconnect(websocket, tid)
+
+
+# ============================================================================
+# QUANTSTATS REPORT ENDPOINT
+# ============================================================================
+
+@app.get("/api/v2/optimization/{tid}/report", tags=["Analytics"])
+async def get_optimization_report(tid: str, include_html: bool = False):
+    """
+    Get QuantStats analytics report for a completed optimization.
+
+    Returns comprehensive performance metrics and tearsheet images
+    using 365-day annualization for cryptocurrency markets.
+
+    - **tid**: Task ID from POST /api/v2/optimization
+    - **include_html**: If true, include full HTML report (large response)
+
+    The response includes:
+    - Performance metrics (Sharpe, Sortino, Calmar, etc.)
+    - Base64-encoded tearsheet images (cumulative returns, drawdown, heatmap, etc.)
+    - Optional HTML report for browser viewing
+    """
+    if tid not in job_storage:
+        raise HTTPException(status_code=404, detail=f"Job {tid} not found")
+
+    job = job_storage[tid]
+
+    if job["status"] != JobStatus.completed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job {tid} is not completed. Status: {job['status'].value}"
+        )
+
+    result = job.get("result")
+    if not result:
+        raise HTTPException(status_code=404, detail=f"No results found for job {tid}")
+
+    # Get returns series from backtest or walkforward result
+    returns = None
+    test_name = result.get("test_name", "Portfolio Report")
+
+    # Try backtest result first
+    if result.get("backtest_result"):
+        backtest = result["backtest_result"]
+        # Returns should be stored in the result
+        if "returns" in backtest and backtest["returns"] is not None:
+            returns_data = backtest["returns"]
+            if isinstance(returns_data, dict):
+                returns = pd.Series(returns_data)
+            elif isinstance(returns_data, pd.Series):
+                returns = returns_data
+
+    # Try walkforward result if no backtest returns
+    if returns is None and result.get("walkforward_result"):
+        wf = result["walkforward_result"]
+        # Try to get returns from the last fold or aggregate
+        fold_results = wf.get("fold_results", [])
+        if fold_results:
+            last_fold = fold_results[-1]
+            if "returns" in last_fold and last_fold["returns"] is not None:
+                returns_data = last_fold["returns"]
+                if isinstance(returns_data, dict):
+                    returns = pd.Series(returns_data)
+                elif isinstance(returns_data, pd.Series):
+                    returns = returns_data
+
+    # If still no returns, try to reconstruct from equity curve
+    if returns is None:
+        if result.get("backtest_result") and "equity_curve" in result["backtest_result"]:
+            equity_data = result["backtest_result"]["equity_curve"]
+            if equity_data:
+                if isinstance(equity_data, dict):
+                    equity = pd.Series(equity_data)
+                elif isinstance(equity_data, pd.Series):
+                    equity = equity_data
+                else:
+                    equity = None
+
+                if equity is not None and len(equity) > 1:
+                    returns = equity.pct_change().dropna()
+
+    if returns is None or len(returns) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Insufficient return data available for analytics. Ensure backtest completed with trades."
+        )
+
+    try:
+        # Create QuantStats reporter with 365-day crypto annualization
+        reporter = QuantStatsReporter(
+            returns=returns,
+            benchmark=None,  # Could add BTC or SPY benchmark in future
+            rf=0.0,
+            periods_per_year=365  # Crypto 24/7 markets
+        )
+
+        # Get report data
+        report_data = reporter.get_report_data(title=test_name)
+
+        # Optionally include HTML report
+        if include_html:
+            report_data['html_report'] = reporter.generate_html_report(title=test_name)
+
+        return {
+            "tid": tid,
+            "status": "success",
+            "report": report_data,
+        }
+
+    except Exception as e:
+        import traceback
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating report: {str(e)}\n{traceback.format_exc()}"
+        ) from e
 
 
 # ============================================================================

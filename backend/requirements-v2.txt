@@ -20,6 +20,9 @@ scikit-learn>=1.3.0  # For TimeSeriesSplit and utilities
 plotly>=5.18.0  # Interactive charts
 matplotlib>=3.7.0
 
+# Portfolio analytics (replaces abandoned PyFolio)
+quantstats>=0.0.62  # Portfolio analytics with 365-day crypto annualization
+
 # Database (maintain compatibility with existing)
 rethinkdb>=2.4.9
 
