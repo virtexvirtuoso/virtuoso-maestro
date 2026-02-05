@@ -35,6 +35,7 @@ import pandas as pd
 from analytics.quantstats_reporter import QuantStatsReporter
 from config.config_reader import ConfigReader, RethinkDbConfig
 from datafeed.data_adapter import get_adapter
+from datafeed.dataframe_cache import DataFrameCache, create_dataframe_cache
 from datasource.providers import DataSourceProviders
 from engine_v2.result_converter import convert_v2_to_v1_schema, convert_walkforward_v2_to_v1
 from engine_v2.strategy_adapter import STRATEGY_REGISTRY
@@ -54,6 +55,21 @@ config_reader = ConfigReader().read(path=config_path)
 rethinkdb_config = config_reader.get_rethinkdb_config()
 optimization_output = config_reader.get_optimization_output_config()
 walkforward_config = config_reader.get_walkforward_config()
+
+# Global DataFrame cache for walk-forward optimization (Phase 5.5)
+# Eliminates repeated DB queries during walk-forward splits
+_dataframe_cache: DataFrameCache | None = None
+
+
+def get_dataframe_cache() -> DataFrameCache:
+    """Get or create the global DataFrame cache."""
+    global _dataframe_cache
+    if _dataframe_cache is None:
+        _dataframe_cache = create_dataframe_cache(
+            rethinkdb_config=rethinkdb_config,
+            adapter_type='rethinkdb'
+        )
+    return _dataframe_cache
 
 
 # ============================================================================
@@ -284,14 +300,19 @@ async def run_optimization_task(
     })
 
     try:
-        # Load data via DataAdapter
-        adapter = get_adapter(config=rethinkdb_config, adapter_type='rethinkdb')
-        df = adapter.load_dataframe(
-            provider=DataSourceProviders[request.provider],
+        # Load data via DataFrameCache (Phase 5.5)
+        # Cache ensures data is loaded once and reused for subsequent requests with same params
+        cache = get_dataframe_cache()
+        provider = DataSourceProviders[request.provider]
+        start_date = datetime.fromtimestamp(request.start_date / 1000).astimezone(pytz.UTC)
+        end_date = datetime.fromtimestamp(request.end_date / 1000).astimezone(pytz.UTC)
+
+        df = cache.get_dataframe(
+            provider=provider,
             symbol=request.symbol,
             bin_size=request.bin_size,
-            start_date=datetime.fromtimestamp(request.start_date / 1000).astimezone(pytz.UTC),
-            end_date=datetime.fromtimestamp(request.end_date / 1000).astimezone(pytz.UTC)
+            start_date=start_date,
+            end_date=end_date
         )
 
         if df.empty:
@@ -766,6 +787,52 @@ async def get_optimization_report(tid: str, include_html: bool = False):
 
 
 # ============================================================================
+# CACHE MANAGEMENT ENDPOINTS (Phase 5.5)
+# ============================================================================
+
+@app.get("/api/v2/cache/stats", tags=["System"])
+async def get_cache_stats():
+    """
+    Get DataFrame cache statistics.
+
+    Returns cache hit/miss counts, memory usage, and number of cached entries.
+    Useful for monitoring cache effectiveness during walk-forward optimization.
+    """
+    cache = get_dataframe_cache()
+    stats = cache.get_stats()
+
+    return {
+        "status": "success",
+        "stats": {
+            "hits": stats['hits'],
+            "misses": stats['misses'],
+            "loads": stats['loads'],
+            "entries": stats['entries'],
+            "memory_mb": round(stats['memory_bytes'] / 1e6, 2),
+            "hit_rate": round(stats['hits'] / max(1, stats['hits'] + stats['misses']) * 100, 1),
+        }
+    }
+
+
+@app.delete("/api/v2/cache", tags=["System"])
+async def clear_cache():
+    """
+    Clear the DataFrame cache.
+
+    Frees memory by removing all cached DataFrames. Call this when switching
+    between different datasets or to reclaim memory after optimization jobs.
+    """
+    cache = get_dataframe_cache()
+    cleared = cache.clear()
+
+    return {
+        "status": "success",
+        "message": f"Cleared {cleared} cached DataFrames",
+        "cleared_entries": cleared,
+    }
+
+
+# ============================================================================
 # HEALTH CHECK
 # ============================================================================
 
@@ -773,10 +840,15 @@ async def get_optimization_report(tid: str, include_html: bool = False):
 @app.get("/api/v2/health", tags=["System"])
 async def health_check():
     """Health check endpoint for load balancers"""
+    cache = get_dataframe_cache()
+    cache_stats = cache.get_stats()
+
     return {
         "status": "healthy",
         "version": "2.0.0",
         "strategies_available": len(STRATEGY_REGISTRY),
+        "cache_entries": cache_stats['entries'],
+        "cache_memory_mb": round(cache_stats['memory_bytes'] / 1e6, 2),
     }
 
 

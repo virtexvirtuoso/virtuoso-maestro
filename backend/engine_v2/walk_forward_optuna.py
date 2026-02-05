@@ -42,6 +42,9 @@ from .optuna_dashboard_storage import (
 from .strategy_adapter import SignalOutput, VectorBTStrategy
 from .vectorbt_engine import BacktestConfig, BacktestResult, VectorBTEngine, calculate_vwr
 
+# DataFrame cache for eliminating repeated data loads
+from datafeed.dataframe_cache import DataFrameCache
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.time_series_split_rolling import TimeSeriesSplitRolling, WindowMode
 
@@ -86,6 +89,9 @@ class WalkForwardConfig:
     # Dashboard storage
     use_dashboard_storage: bool = True  # Store studies in SQLite for dashboard
     storage_url: str = None  # SQLite URL (auto-generated if None)
+
+    # DataFrame caching (Phase 5.5)
+    use_dataframe_cache: bool = True  # Cache data in memory for split slicing
 
 
 @dataclass

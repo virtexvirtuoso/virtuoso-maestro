@@ -57,3 +57,5 @@ config:
         sortino_ratio: 0.20
         calmar_ratio: 0.15
         turnover_penalty: 0.10
+    dataframe_cache:
+      enabled: true  # Cache DataFrames in memory for walk-forward splits

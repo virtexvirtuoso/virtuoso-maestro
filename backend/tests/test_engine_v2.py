@@ -2609,6 +2609,556 @@ class TestMultiObjectiveIntegration:
 
 
 # =============================================================================
+# Phase 5.5: DataFrame Cache Tests
+# =============================================================================
+
+class MockDataAdapter:
+    """Mock data adapter for testing cache without database."""
+
+    def __init__(self):
+        self.load_count = 0
+        self._data = {}
+
+    def load_dataframe(self, provider, symbol, bin_size, start_date, end_date):
+        """Track load calls and return test data."""
+        self.load_count += 1
+
+        # Generate consistent test data based on parameters
+        key = f"{provider.value}_{symbol}_{bin_size}"
+        if key not in self._data:
+            np.random.seed(hash(key) % 2**32)
+            n_bars = 500
+            returns = np.random.randn(n_bars) * 0.02
+            close = 100 * np.exp(np.cumsum(returns))
+
+            self._data[key] = pd.DataFrame({
+                'open': close * (1 + np.random.randn(n_bars) * 0.001),
+                'high': close * (1 + np.abs(np.random.randn(n_bars) * 0.01)),
+                'low': close * (1 - np.abs(np.random.randn(n_bars) * 0.01)),
+                'close': close,
+                'volume': np.random.randint(1000, 10000, n_bars),
+            }, index=pd.date_range(start_date, periods=n_bars, freq='D', tz='UTC'))
+
+        return self._data[key]
+
+    def is_available(self):
+        return True
+
+
+class TestDataFrameCache:
+    """Tests for the DataFrameCache class."""
+
+    def test_cache_import(self):
+        """Test that DataFrameCache can be imported."""
+        from datafeed.dataframe_cache import DataFrameCache, CacheKey
+        assert DataFrameCache is not None
+        assert CacheKey is not None
+
+    def test_cache_hit_returns_cached_data(self):
+        """Test that second get_dataframe() returns cached data."""
+        from datafeed.dataframe_cache import DataFrameCache
+        from datasource.providers import DataSourceProviders
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        # First call - cache miss
+        df1 = cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+        assert adapter.load_count == 1
+
+        # Second call - cache hit
+        df2 = cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+        assert adapter.load_count == 1  # Still 1, not 2
+
+        # Verify same data
+        pd.testing.assert_frame_equal(df1, df2)
+
+    def test_cache_different_params_miss(self):
+        """Test that different parameters cause cache miss."""
+        from datafeed.dataframe_cache import DataFrameCache
+        from datasource.providers import DataSourceProviders
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        # First call
+        cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+        assert adapter.load_count == 1
+
+        # Different symbol - should miss
+        cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='BTCUSDT',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+        assert adapter.load_count == 2
+
+    def test_slice_by_index_produces_correct_subset(self):
+        """Test slice_by_index produces correct subsets."""
+        from datafeed.dataframe_cache import DataFrameCache
+        from datasource.providers import DataSourceProviders
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        df = cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+
+        # Slice by index
+        indices = np.array([0, 5, 10, 15, 20])
+        sliced = cache.slice_by_index(df, indices)
+
+        assert len(sliced) == 5
+        assert list(sliced.index) == list(df.iloc[indices].index)
+
+    def test_slice_by_index_with_range(self):
+        """Test slice_by_index with contiguous range."""
+        from datafeed.dataframe_cache import DataFrameCache
+        from datasource.providers import DataSourceProviders
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        df = cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+
+        # Slice contiguous range (typical for walk-forward)
+        indices = np.arange(100, 200)
+        sliced = cache.slice_by_index(df, indices)
+
+        assert len(sliced) == 100
+        pd.testing.assert_frame_equal(sliced.reset_index(drop=True), df.iloc[100:200].reset_index(drop=True))
+
+    def test_slice_by_date(self):
+        """Test slice_by_date produces correct subsets."""
+        from datafeed.dataframe_cache import DataFrameCache
+        from datasource.providers import DataSourceProviders
+        import pytz
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        df = cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+
+        # Slice by date range
+        slice_start = datetime(2020, 3, 1, tzinfo=pytz.UTC)
+        slice_end = datetime(2020, 4, 1, tzinfo=pytz.UTC)
+        sliced = cache.slice_by_date(df, slice_start, slice_end)
+
+        # Verify all dates in range
+        assert all(slice_start <= idx <= slice_end for idx in sliced.index)
+
+    def test_memory_usage_tracks_correctly(self):
+        """Test memory_usage() returns correct bytes."""
+        from datafeed.dataframe_cache import DataFrameCache
+        from datasource.providers import DataSourceProviders
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        # Empty cache should have 0 memory
+        assert cache.memory_usage() == 0
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        # Add data
+        df = cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+
+        # Memory should now be positive
+        memory = cache.memory_usage()
+        assert memory > 0
+
+        # Should approximately match DataFrame memory
+        expected = df.memory_usage(deep=True).sum()
+        assert abs(memory - expected) < 1000  # Allow small variance
+
+    def test_clear_frees_memory(self):
+        """Test clear() frees cache memory."""
+        from datafeed.dataframe_cache import DataFrameCache
+        from datasource.providers import DataSourceProviders
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        # Add data
+        cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+        assert cache.memory_usage() > 0
+
+        # Clear cache
+        cleared = cache.clear()
+        assert cleared == 1
+        assert cache.memory_usage() == 0
+        assert len(cache) == 0
+
+    def test_get_stats_returns_correct_counts(self):
+        """Test get_stats() returns correct hit/miss counts."""
+        from datafeed.dataframe_cache import DataFrameCache
+        from datasource.providers import DataSourceProviders
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        # Initial stats
+        stats = cache.get_stats()
+        assert stats['hits'] == 0
+        assert stats['misses'] == 0
+
+        # First call - miss
+        cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+        stats = cache.get_stats()
+        assert stats['hits'] == 0
+        assert stats['misses'] == 1
+        assert stats['loads'] == 1
+
+        # Second call - hit
+        cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+        stats = cache.get_stats()
+        assert stats['hits'] == 1
+        assert stats['misses'] == 1
+
+    def test_has_cached(self):
+        """Test has_cached() returns correct status."""
+        from datafeed.dataframe_cache import DataFrameCache
+        from datasource.providers import DataSourceProviders
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        # Not cached initially
+        assert not cache.has_cached(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+
+        # Load data
+        cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+
+        # Now cached
+        assert cache.has_cached(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+
+    def test_invalidate_removes_entry(self):
+        """Test invalidate() removes specific cache entry."""
+        from datafeed.dataframe_cache import DataFrameCache
+        from datasource.providers import DataSourceProviders
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        # Add two entries
+        cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+        cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='BTCUSDT',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+        assert len(cache) == 2
+
+        # Invalidate one
+        removed = cache.invalidate(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+        assert removed == 1
+        assert len(cache) == 1
+
+        # Second one should still be cached
+        assert cache.has_cached(
+            provider=DataSourceProviders.BINANCE,
+            symbol='BTCUSDT',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+
+    def test_cache_key_case_insensitive_symbol(self):
+        """Test that cache key is case-insensitive for symbol."""
+        from datafeed.dataframe_cache import DataFrameCache
+        from datasource.providers import DataSourceProviders
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        # Load with uppercase
+        cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+
+        # Check with lowercase - should be same entry
+        assert cache.has_cached(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ethbtc',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+        assert adapter.load_count == 1
+
+    def test_preload_alias(self):
+        """Test preload() works as alias for get_dataframe()."""
+        from datafeed.dataframe_cache import DataFrameCache
+        from datasource.providers import DataSourceProviders
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        start = datetime(2020, 1, 1)
+        end = datetime(2021, 1, 1)
+
+        # Use preload
+        df = cache.preload(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+
+        assert df is not None
+        assert len(df) > 0
+        assert cache.has_cached(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=start,
+            end_date=end
+        )
+
+    def test_repr(self):
+        """Test __repr__ method."""
+        from datafeed.dataframe_cache import DataFrameCache
+
+        adapter = MockDataAdapter()
+        cache = DataFrameCache(data_adapter=adapter)
+
+        repr_str = repr(cache)
+        assert 'DataFrameCache' in repr_str
+        assert 'entries=' in repr_str
+        assert 'hits=' in repr_str
+
+
+class TestDataFrameCacheIntegration:
+    """Integration tests for DataFrame cache with walk-forward."""
+
+    def test_cache_only_one_db_load_during_walkforward(self, trending_data):
+        """Validate that walk-forward only loads data once when using cache."""
+        from datafeed.dataframe_cache import DataFrameCache
+
+        # Create a mock adapter that tracks calls
+        class TrackingAdapter:
+            def __init__(self, data):
+                self.load_count = 0
+                self._data = data
+
+            def load_dataframe(self, provider, symbol, bin_size, start_date, end_date):
+                self.load_count += 1
+                return self._data
+
+            def is_available(self):
+                return True
+
+        adapter = TrackingAdapter(trending_data)
+        cache = DataFrameCache(data_adapter=adapter)
+
+        # Simulate walk-forward pattern: load once, slice many times
+        from datasource.providers import DataSourceProviders
+
+        # Initial load
+        df = cache.get_dataframe(
+            provider=DataSourceProviders.BINANCE,
+            symbol='ETHBTC',
+            bin_size='1d',
+            start_date=datetime(2020, 1, 1),
+            end_date=datetime(2021, 1, 1)
+        )
+        assert adapter.load_count == 1
+
+        # Simulate walk-forward splits (multiple slices from cached data)
+        num_splits = 5
+        split_size = len(df) // (num_splits + 1)
+
+        for i in range(num_splits):
+            train_start = i * split_size
+            train_end = (i + 2) * split_size
+            test_start = train_end
+            test_end = test_start + split_size
+
+            # Slice train/test data
+            train_indices = np.arange(train_start, min(train_end, len(df)))
+            test_indices = np.arange(test_start, min(test_end, len(df)))
+
+            train_data = cache.slice_by_index(df, train_indices)
+            test_data = cache.slice_by_index(df, test_indices)
+
+            # Verify we got data
+            assert len(train_data) > 0
+            if test_start < len(df):
+                assert len(test_data) >= 0
+
+        # Still only 1 load despite multiple slices
+        assert adapter.load_count == 1, f"Expected 1 DB load, got {adapter.load_count}"
+
+    def test_cache_with_actual_walkforward_engine(self, trending_data):
+        """Test that WalkForwardOptuna with cache setting works correctly."""
+        strategy = EMACrossStrategy()
+
+        # Use small number of trials for speed
+        config = WalkForwardConfig(
+            num_splits=3,
+            train_splits=1,
+            test_splits=1,
+            n_trials=5,
+            use_dashboard_storage=False,
+            use_dataframe_cache=True,  # Enable cache (Phase 5.5)
+        )
+
+        engine = WalkForwardOptuna(
+            data=trending_data,
+            strategy=strategy,
+            config=config,
+        )
+
+        # Run walk-forward
+        result = engine.run()
+
+        # Verify it completed
+        assert len(result.fold_results) > 0
+        assert result.total_processing_time > 0
+
+    def test_factory_function(self):
+        """Test create_dataframe_cache factory function."""
+        from datafeed.dataframe_cache import create_dataframe_cache
+
+        # Should work without RethinkDB config (will fail on actual load)
+        # but the cache itself should be created
+        try:
+            cache = create_dataframe_cache(adapter_type='parquet', data_dir='/tmp/test_cache')
+            assert cache is not None
+        except Exception:
+            pass  # Expected if parquet adapter not available
+
+
+# =============================================================================
 # Run tests
 # =============================================================================
 

@@ -76,4 +76,4 @@ __all__ = [
     'weighted_score',
 ]
 
-__version__ = '2.3.0'  # Bumped for multi-objective selection
+__version__ = '2.4.0'  # Bumped for DataFrame cache (Phase 5.5)
