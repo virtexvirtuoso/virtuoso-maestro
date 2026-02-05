@@ -1,4 +1,4 @@
-version: "3.3"
+version: "3.8"
 services:
   maestro-be:
     build:
@@ -9,9 +9,16 @@ services:
     environment:
       - CONFIG_FILE=maestro-prd.yaml
     depends_on:
-      - rethinkdb
+      rethinkdb:
+        condition: service_healthy
     entrypoint: bash
     command: ./wait-for-it.sh rethinkdb:28015 -- python3 main/rest_api.py
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/strategy/available"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
   maestro-bitmex:
     build:
       dockerfile: backend.Dockerfile
@@ -19,7 +26,8 @@ services:
     environment:
       - CONFIG_FILE=maestro-prd.yaml
     depends_on:
-      - rethinkdb
+      rethinkdb:
+        condition: service_healthy
     entrypoint: bash
     command: ./wait-for-it.sh rethinkdb:28015 -- python3 main/data_bitmex_download.py
   maestro-binance:
@@ -29,7 +37,8 @@ services:
     environment:
       - CONFIG_FILE=maestro-prd.yaml
     depends_on:
-      - rethinkdb
+      rethinkdb:
+        condition: service_healthy
     entrypoint: bash
     command: ./wait-for-it.sh rethinkdb:28015 -- python3 main/data_binance_download.py
   maestro-fe:
@@ -39,7 +48,8 @@ services:
     ports:
       - 8080:5000
     depends_on:
-      - maestro-be
+      maestro-be:
+        condition: service_healthy
     entrypoint: bash
     command: ./wait-for-it.sh maestro-be:5050 -- serve -s build
   rethinkdb:
@@ -50,6 +60,12 @@ services:
     volumes:
       - db-data:/data
     command: rethinkdb --bind all
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   db-data:
