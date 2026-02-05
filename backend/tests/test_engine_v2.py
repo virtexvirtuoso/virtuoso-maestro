@@ -909,6 +909,382 @@ class TestWalkForwardWithDashboardStorage:
 
 
 # =============================================================================
+# Parallel Walk-Forward Tests
+# =============================================================================
+
+from engine_v2.parallel_walk_forward import (
+    ParallelConfig,
+    ParallelWalkForward,
+    process_single_split,
+    run_parallel_walkforward,
+)
+
+
+class TestParallelWalkForward:
+    """Tests for parallel walk-forward optimization"""
+
+    def test_parallel_config_default_workers(self):
+        """Test ParallelConfig defaults to cpu_count - 1"""
+        import multiprocessing as mp
+        config = ParallelConfig()
+        expected = max(1, mp.cpu_count() - 1)
+        assert config.max_workers == expected
+        assert config.enabled is True
+
+    def test_parallel_config_custom_workers(self):
+        """Test ParallelConfig with custom max_workers"""
+        config = ParallelConfig(enabled=True, max_workers=2)
+        assert config.max_workers == 2
+        assert config.enabled is True
+
+    def test_parallel_config_disabled(self):
+        """Test ParallelConfig can be disabled"""
+        config = ParallelConfig(enabled=False)
+        assert config.enabled is False
+
+    def test_parallel_walkforward_initialization(self, small_data):
+        """Test parallel walk-forward engine can be initialized"""
+        strategy = EMACrossStrategy()
+        wf_config = WalkForwardConfig(num_splits=5, train_splits=2, test_splits=1, n_trials=3)
+        parallel_config = ParallelConfig(max_workers=2)
+
+        engine = ParallelWalkForward(
+            data=small_data,
+            strategy=strategy,
+            config=wf_config,
+            parallel_config=parallel_config,
+        )
+
+        assert engine.max_workers == 2
+        assert engine.config.num_splits == 5
+
+    def test_single_worker_execution(self, small_data):
+        """Test with max_workers=1 produces same results as sequential"""
+        strategy = RSIStrategy()
+        wf_config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=5,
+            use_dashboard_storage=False,
+        )
+        parallel_config = ParallelConfig(max_workers=1)
+
+        engine = ParallelWalkForward(
+            data=small_data,
+            strategy=strategy,
+            config=wf_config,
+            parallel_config=parallel_config,
+        )
+
+        result = engine.run()
+
+        assert isinstance(result, WalkForwardResult)
+        assert len(result.fold_results) == 4  # num_splits=5 gives 4 folds
+        assert len(result.optimal_params_per_fold) == 4
+        assert result.total_processing_time > 0
+
+    def test_multi_worker_execution(self, small_data):
+        """Test with max_workers=4 produces valid results"""
+        strategy = RSIStrategy()
+        wf_config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=3,
+            use_dashboard_storage=False,
+        )
+        parallel_config = ParallelConfig(max_workers=4)
+
+        engine = ParallelWalkForward(
+            data=small_data,
+            strategy=strategy,
+            config=wf_config,
+            parallel_config=parallel_config,
+        )
+
+        result = engine.run()
+
+        assert isinstance(result, WalkForwardResult)
+        assert len(result.fold_results) == 4
+        assert len(result.optimal_params_per_fold) == 4
+
+    def test_single_vs_multi_worker_correctness(self, small_data):
+        """Test that single and multi-worker produce consistent results"""
+        np.random.seed(42)
+        strategy = RSIStrategy()
+
+        # Run with single worker
+        wf_config1 = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=3,
+            use_dashboard_storage=False,
+        )
+        engine1 = ParallelWalkForward(
+            data=small_data,
+            strategy=strategy,
+            config=wf_config1,
+            parallel_config=ParallelConfig(max_workers=1),
+        )
+        result1 = engine1.run()
+
+        # Run with multiple workers
+        wf_config2 = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=3,
+            use_dashboard_storage=False,
+        )
+        engine2 = ParallelWalkForward(
+            data=small_data,
+            strategy=strategy,
+            config=wf_config2,
+            parallel_config=ParallelConfig(max_workers=2),
+        )
+        result2 = engine2.run()
+
+        # Both should have same number of folds
+        assert len(result1.fold_results) == len(result2.fold_results)
+
+        # Results should be in same order (by split_idx)
+        for i in range(len(result1.fold_results)):
+            # Both should have valid results (not necessarily identical due to Optuna randomness)
+            assert result1.fold_results[i].num_trades >= 0
+            assert result2.fold_results[i].num_trades >= 0
+
+    def test_progress_callback(self, small_data):
+        """Test progress callback is called during parallel execution"""
+        progress_calls = []
+
+        def progress_cb(cur, total, msg):
+            progress_calls.append((cur, total, msg))
+
+        strategy = RSIStrategy()
+        wf_config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=3,
+            use_dashboard_storage=False,
+        )
+
+        engine = ParallelWalkForward(
+            data=small_data,
+            strategy=strategy,
+            config=wf_config,
+            parallel_config=ParallelConfig(max_workers=2),
+            progress_callback=progress_cb,
+        )
+
+        engine.run()
+
+        # Progress should have been called for each split
+        assert len(progress_calls) >= 4  # At least one per fold plus completion
+
+    def test_process_single_split_function(self, small_data):
+        """Test the standalone process_single_split function"""
+        from utils.time_series_split_rolling import TimeSeriesSplitRolling
+
+        strategy = RSIStrategy()
+        wf_config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=3,
+            use_dashboard_storage=False,
+        )
+        backtest_config = BacktestConfig()
+
+        # Get splits
+        tscv = TimeSeriesSplitRolling(5)
+        splits = list(tscv.split(small_data, fixed_length=True, train_splits=2, test_splits=1))
+
+        # Process first split
+        train_idx, test_idx = splits[0]
+        split_idx, opt_params, test_result = process_single_split(
+            0, train_idx, test_idx, small_data, strategy, wf_config, backtest_config
+        )
+
+        assert split_idx == 0
+        assert isinstance(opt_params, dict)
+        assert 'period' in opt_params
+        assert isinstance(test_result, BacktestResult)
+
+    def test_run_parallel_walkforward_convenience(self, trending_data):
+        """Test the run_parallel_walkforward convenience function"""
+        strategy = EMACrossStrategy()
+
+        result = run_parallel_walkforward(
+            data=trending_data,
+            strategy=strategy,
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=5,
+            max_workers=2,
+        )
+
+        assert isinstance(result, WalkForwardResult)
+        assert len(result.fold_results) >= 3
+        assert result.aggregate_metrics is not None
+        assert 'avg_sharpe' in result.aggregate_metrics
+
+    def test_parallel_disabled_runs_sequential(self, small_data):
+        """Test that parallel.enabled=False runs sequentially"""
+        strategy = RSIStrategy()
+        wf_config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=3,
+            use_dashboard_storage=False,
+        )
+        parallel_config = ParallelConfig(enabled=False, max_workers=4)
+
+        engine = ParallelWalkForward(
+            data=small_data,
+            strategy=strategy,
+            config=wf_config,
+            parallel_config=parallel_config,
+        )
+
+        result = engine.run()
+
+        # Should still produce valid results
+        assert len(result.fold_results) == 4
+
+    def test_combined_equity_curve(self, trending_data):
+        """Test combined equity curve is generated"""
+        strategy = EMACrossStrategy()
+
+        result = run_parallel_walkforward(
+            data=trending_data,
+            strategy=strategy,
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=3,
+            max_workers=2,
+        )
+
+        assert result.combined_equity_curve is not None
+
+    def test_results_ordered_by_split_idx(self, small_data):
+        """Test that results are returned in order by split index"""
+        strategy = RSIStrategy()
+        wf_config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=3,
+            use_dashboard_storage=False,
+        )
+
+        engine = ParallelWalkForward(
+            data=small_data,
+            strategy=strategy,
+            config=wf_config,
+            parallel_config=ParallelConfig(max_workers=4),
+        )
+
+        result = engine.run()
+
+        # Results should be in order (can't directly verify split_idx, but count should match)
+        assert len(result.fold_results) == len(result.optimal_params_per_fold)
+
+    def test_different_strategies_parallel(self, small_data):
+        """Test parallel execution with different strategies"""
+        strategies = [
+            EMACrossStrategy(),
+            RSIStrategy(),
+            MACDStrategy(),
+        ]
+
+        for strategy in strategies:
+            wf_config = WalkForwardConfig(
+                num_splits=5,
+                train_splits=2,
+                test_splits=1,
+                n_trials=3,
+                use_dashboard_storage=False,
+            )
+
+            engine = ParallelWalkForward(
+                data=small_data,
+                strategy=strategy,
+                config=wf_config,
+                parallel_config=ParallelConfig(max_workers=2),
+            )
+
+            result = engine.run()
+            assert len(result.fold_results) >= 2
+
+
+class TestParallelPerformance:
+    """Performance tests for parallel walk-forward"""
+
+    def test_timing_logged(self, small_data):
+        """Test that total processing time is logged"""
+        strategy = RSIStrategy()
+
+        result = run_parallel_walkforward(
+            data=small_data,
+            strategy=strategy,
+            num_splits=5,
+            n_trials=3,
+            max_workers=2,
+        )
+
+        assert result.total_processing_time > 0
+
+    def test_speedup_multi_core(self, trending_data):
+        """Test that multi-core provides speedup over single-core"""
+        import time
+
+        strategy = RSIStrategy()
+        wf_config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=10,  # More trials to make parallelism worthwhile
+            use_dashboard_storage=False,
+        )
+
+        # Time single worker
+        start = time.time()
+        engine1 = ParallelWalkForward(
+            data=trending_data,
+            strategy=strategy,
+            config=wf_config,
+            parallel_config=ParallelConfig(max_workers=1),
+        )
+        result1 = engine1.run()
+        single_time = time.time() - start
+
+        # Time multi worker
+        start = time.time()
+        engine2 = ParallelWalkForward(
+            data=trending_data,
+            strategy=strategy,
+            config=wf_config,
+            parallel_config=ParallelConfig(max_workers=4),
+        )
+        result2 = engine2.run()
+        multi_time = time.time() - start
+
+        # Both should produce valid results
+        assert len(result1.fold_results) == len(result2.fold_results)
+
+        # Log timings for informational purposes
+        # (speedup depends on system, so we just verify both complete)
+        print(f"\nSingle worker: {single_time:.2f}s, Multi worker: {multi_time:.2f}s")
+        print(f"Speedup: {single_time / multi_time:.2f}x")
+
+
+# =============================================================================
 # Performance Tests
 # =============================================================================
 

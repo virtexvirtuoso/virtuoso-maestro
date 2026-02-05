@@ -91,5 +91,6 @@ config:
     kind:
       walkforward:
         num_splits: 10
-
-
+    parallel:
+      enabled: true
+      max_workers: null  # null = auto (cpu_count - 1)

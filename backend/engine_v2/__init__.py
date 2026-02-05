@@ -11,6 +11,12 @@ from .optuna_dashboard_storage import (
     get_default_storage_path,
     get_storage_url,
 )
+from .parallel_walk_forward import (
+    ParallelConfig,
+    ParallelWalkForward,
+    process_single_split,
+    run_parallel_walkforward,
+)
 from .strategy_adapter import StrategyAdapter, VectorBTStrategy
 from .vectorbt_engine import VectorBTEngine
 from .walk_forward_optuna import WalkForwardOptuna
@@ -18,6 +24,10 @@ from .walk_forward_optuna import WalkForwardOptuna
 __all__ = [
     'VectorBTEngine',
     'WalkForwardOptuna',
+    'ParallelWalkForward',
+    'ParallelConfig',
+    'process_single_split',
+    'run_parallel_walkforward',
     'StrategyAdapter',
     'VectorBTStrategy',
     'OptunaDashboardStorage',
@@ -26,4 +36,4 @@ __all__ = [
     'get_default_storage_path',
 ]
 
-__version__ = '2.0.0'
+__version__ = '2.1.0'
