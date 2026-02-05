@@ -79,4 +79,4 @@ brctl download ~/Library/CloudStorage/Dropbox/VIRTEX/FILOS/Videos/
 ---
 
 *Archived: February 5, 2026*
-*See: `docs/TIMELINE.md` for full project history*
+*See: `docs/project/TIMELINE.md` for full project history*
