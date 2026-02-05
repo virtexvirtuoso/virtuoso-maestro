@@ -23,7 +23,7 @@ import optuna
 from optuna.pruners import MedianPruner, HyperbandPruner
 from optuna.samplers import TPESampler
 
-from .vectorbt_engine import VectorBTEngine, BacktestConfig, BacktestResult
+from .vectorbt_engine import VectorBTEngine, BacktestConfig, BacktestResult, calculate_vwr
 from .strategy_adapter import VectorBTStrategy, SignalOutput
 
 # Import the original TimeSeriesSplitRolling for compatibility
@@ -51,6 +51,7 @@ class WalkForwardConfig:
     # Optuna optimization settings
     n_trials: int = 100  # Number of Optuna trials per fold
     optimization_metric: str = 'sharpe_ratio'  # Metric to optimize
+    use_vwr_ranking: bool = True  # Use combined Sharpe + VWR ranking (matches V1)
     pruning_enabled: bool = True
     n_startup_trials: int = 10  # Trials before pruning kicks in
     
@@ -77,12 +78,14 @@ class WalkForwardResult:
         if self.fold_results:
             # Safe extraction with defaults for empty lists
             sharpe_values = [r.sharpe_ratio for r in self.fold_results if r.sharpe_ratio is not None]
+            vwr_values = [r.vwr for r in self.fold_results if r.vwr is not None]
             win_rate_values = [r.win_rate for r in self.fold_results if r.win_rate is not None]
             drawdown_values = [r.max_drawdown for r in self.fold_results if r.max_drawdown is not None]
-            
+
             self.aggregate_metrics = {
                 'total_return': sum(r.total_return for r in self.fold_results),
                 'avg_sharpe': np.mean(sharpe_values) if sharpe_values else 0.0,
+                'avg_vwr': np.mean(vwr_values) if vwr_values else 0.0,
                 'avg_win_rate': np.mean(win_rate_values) if win_rate_values else 0.0,
                 'total_trades': sum(r.num_trades for r in self.fold_results),
                 'max_drawdown': max(drawdown_values) if drawdown_values else 0.0,
@@ -308,16 +311,25 @@ class WalkForwardOptuna(Thread):
             # Run backtest
             try:
                 result = self._backtest_with_params(train_data, params)
-                
+
                 # Return optimization metric
-                metric = getattr(result, self.config.optimization_metric, result.sharpe_ratio)
-                
+                # When use_vwr_ranking is enabled, combine Sharpe and VWR for ranking
+                # This matches V1 behavior: sort_values(by=['sharpe_ratio', 'vwr'])
+                if self.config.use_vwr_ranking:
+                    sharpe = result.sharpe_ratio if not pd.isna(result.sharpe_ratio) else 0.0
+                    vwr = result.vwr if not pd.isna(result.vwr) else 0.0
+                    # Combined score: primary by Sharpe, secondary by VWR
+                    # Scale VWR to be a secondary factor (add small fraction)
+                    metric = sharpe + (vwr * 0.001)
+                else:
+                    metric = getattr(result, self.config.optimization_metric, result.sharpe_ratio)
+
                 # Handle nan/inf
                 if pd.isna(metric) or np.isinf(metric):
                     return float('-inf')
-                    
+
                 return metric
-                
+
             except Exception as e:
                 self.logger.debug(f"Trial failed: {e}")
                 return float('-inf')
@@ -478,6 +490,7 @@ class WalkForwardOptuna(Thread):
                 'kind': OptimizationType.OPTUNA.value,
                 'analyzers': {
                     'sharpe_ratio': result.sharpe_ratio,
+                    'vwr': result.vwr,
                     'total_return': result.total_return,
                     'max_drawdown': result.max_drawdown,
                     'win_rate': result.win_rate,

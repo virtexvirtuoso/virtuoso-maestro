@@ -32,7 +32,62 @@ class BacktestConfig:
     freq: str = 'D'  # Data frequency
 
 
-@dataclass 
+def calculate_vwr(returns: pd.Series, annualization_factor: int = 365) -> float:
+    """
+    Calculate Variability-Weighted Return (VWR).
+
+    VWR penalizes high-variance strategies even if they have high returns.
+    This prevents overfitting selection in walk-forward optimization by
+    preferring strategies with consistent returns over erratic high performers.
+
+    Formula: VWR = mean_return * annualization / (std_dev * sqrt(annualization) * tau)
+    where tau = 2.0 (standard VWR penalty factor)
+
+    Args:
+        returns: Series of periodic returns (e.g., daily returns)
+        annualization_factor: Number of periods per year (365 for daily, 252 for trading days)
+
+    Returns:
+        VWR value (higher is better, penalizes volatility)
+
+    References:
+        - Based on Backtrader's VWR analyzer concept
+        - See: https://www.crystalbull.com/sharpe-ratio-better-with-log-returns/
+    """
+    if returns is None or len(returns) < 2:
+        return 0.0
+
+    # Drop NaN values
+    returns_clean = returns.dropna()
+    if len(returns_clean) < 2:
+        return 0.0
+
+    mean_return = returns_clean.mean()
+    std_dev = returns_clean.std()
+
+    # Handle zero or near-zero standard deviation
+    # Use a minimum threshold to avoid division by very small numbers
+    if std_dev < 1e-10 or np.isnan(std_dev):
+        return 0.0
+
+    # Annualized mean return
+    annualized_mean = mean_return * annualization_factor
+
+    # Annualized standard deviation
+    annualized_std = std_dev * np.sqrt(annualization_factor)
+
+    # VWR formula with tau = 2.0 penalty factor
+    tau = 2.0
+    vwr = annualized_mean / (annualized_std * tau)
+
+    # Handle edge cases
+    if np.isnan(vwr) or np.isinf(vwr):
+        return 0.0
+
+    return float(vwr)
+
+
+@dataclass
 class BacktestResult:
     """Results from a backtest run"""
     total_return: float
@@ -45,16 +100,17 @@ class BacktestResult:
     volatility: float
     calmar_ratio: float
     sortino_ratio: float
-    
+    vwr: float = 0.0  # Variability-Weighted Return
+
     # Detailed data
     equity_curve: pd.Series = field(default=None)
     trades: pd.DataFrame = field(default=None)
     returns: pd.Series = field(default=None)
     positions: pd.Series = field(default=None)
-    
+
     # Parameters used
     parameters: Dict[str, Any] = field(default_factory=dict)
-    
+
     # Timing
     start_date: datetime = None
     end_date: datetime = None
@@ -266,7 +322,10 @@ class VectorBTEngine:
             equity_curve = None
             returns = None
             positions = None
-        
+
+        # Calculate VWR (Variability-Weighted Return)
+        vwr = calculate_vwr(returns) if returns is not None else 0.0
+
         return BacktestResult(
             total_return=total_return,
             sharpe_ratio=sharpe,
@@ -278,6 +337,7 @@ class VectorBTEngine:
             volatility=volatility,
             calmar_ratio=calmar,
             sortino_ratio=sortino,
+            vwr=vwr,
             equity_curve=equity_curve,
             trades=trades,
             returns=returns,
