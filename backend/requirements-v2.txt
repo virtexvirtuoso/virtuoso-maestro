@@ -7,6 +7,7 @@ vectorbt>=0.26.0  # Vectorized backtesting (use vectorbtpro if licensed)
 
 # Optimization
 optuna>=3.0.0  # Bayesian hyperparameter optimization with pruning
+optuna-dashboard>=0.15.0  # Web UI for Optuna study visualization
 
 # Data processing  
 pandas>=2.0.0  # Modern pandas with PyArrow backend support

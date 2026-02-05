@@ -153,6 +153,22 @@ services:
       retries: 3
       start_period: 15s
 
+  # Optuna Dashboard - Web UI for hyperparameter optimization visualization
+  optuna-dashboard:
+    image: ghcr.io/optuna/optuna-dashboard:latest
+    ports:
+      - 8050:8080
+    volumes:
+      - optuna-data:/data
+    command: ["sqlite:////data/optuna_studies.db"]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
 volumes:
   db-data:
   questdb-data:
+  optuna-data:

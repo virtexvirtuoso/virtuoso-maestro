@@ -38,7 +38,14 @@ from engine_v2.walk_forward_optuna import (
     WalkForwardResult,
     run_simple_walkforward,
 )
+from engine_v2.optuna_dashboard_storage import (
+    OptunaDashboardStorage,
+    create_study_with_dashboard,
+    get_storage_url,
+    get_default_storage_path,
+)
 from utils.time_series_split_rolling import TimeSeriesSplitRolling
+import optuna
 
 
 # =============================================================================
@@ -589,6 +596,316 @@ class TestIntegration:
         
         # Should have same number of folds
         assert len(result.fold_results) == len(original_splits)
+
+
+# =============================================================================
+# Optuna Dashboard Storage Tests
+# =============================================================================
+
+class TestOptunaDashboardStorage:
+    """Tests for Optuna dashboard storage functionality"""
+
+    @pytest.fixture
+    def temp_storage(self, tmp_path):
+        """Create a temporary storage instance"""
+        db_path = str(tmp_path / "test_optuna_studies.db")
+        return OptunaDashboardStorage(db_path=db_path)
+
+    def test_storage_initialization(self, temp_storage):
+        """Test storage initializes correctly"""
+        assert temp_storage.storage_url.startswith("sqlite:///")
+        assert "test_optuna_studies.db" in temp_storage.storage_url
+
+    def test_storage_url_format(self, tmp_path):
+        """Test get_storage_url returns correct format"""
+        db_path = str(tmp_path / "custom.db")
+        url = get_storage_url(db_path)
+        assert url == f"sqlite:///{db_path}"
+
+    def test_default_storage_path(self):
+        """Test default storage path is valid"""
+        path = get_default_storage_path()
+        assert path.endswith("optuna_studies.db")
+        assert "data" in path
+
+    def test_create_study_with_dashboard(self, temp_storage):
+        """Test creating a study with dashboard storage"""
+        study = temp_storage.create_study_with_dashboard(fold_idx=0)
+
+        assert study is not None
+        assert study.study_name == "maestro_fold_0"
+        assert study.direction == optuna.study.StudyDirection.MAXIMIZE
+
+    def test_study_naming_convention(self, temp_storage):
+        """Test studies follow maestro_fold_{idx} naming convention"""
+        study0 = temp_storage.create_study_with_dashboard(fold_idx=0)
+        study1 = temp_storage.create_study_with_dashboard(fold_idx=1)
+        study5 = temp_storage.create_study_with_dashboard(fold_idx=5)
+
+        assert study0.study_name == "maestro_fold_0"
+        assert study1.study_name == "maestro_fold_1"
+        assert study5.study_name == "maestro_fold_5"
+
+    def test_load_if_exists_warm_start(self, temp_storage):
+        """Test load_if_exists enables warm-starting"""
+        # Create study and add a trial
+        study1 = temp_storage.create_study_with_dashboard(fold_idx=0)
+
+        def objective(trial):
+            x = trial.suggest_float("x", 0, 10)
+            return x
+
+        study1.optimize(objective, n_trials=5)
+        n_trials_first = len(study1.trials)
+
+        # Load existing study - should have previous trials
+        study2 = temp_storage.create_study_with_dashboard(
+            fold_idx=0, load_if_exists=True
+        )
+        assert len(study2.trials) == n_trials_first
+
+        # Add more trials to warm-started study
+        study2.optimize(objective, n_trials=3)
+        assert len(study2.trials) == n_trials_first + 3
+
+    def test_list_studies(self, temp_storage):
+        """Test listing all studies"""
+        # Create multiple studies
+        temp_storage.create_study_with_dashboard(fold_idx=0)
+        temp_storage.create_study_with_dashboard(fold_idx=1)
+        temp_storage.create_study_with_dashboard(fold_idx=2)
+
+        summaries = temp_storage.list_studies()
+
+        assert len(summaries) == 3
+        names = [s.study_name for s in summaries]
+        assert "maestro_fold_0" in names
+        assert "maestro_fold_1" in names
+        assert "maestro_fold_2" in names
+
+    def test_get_study(self, temp_storage):
+        """Test loading existing study by fold index"""
+        # Create and optimize a study
+        study = temp_storage.create_study_with_dashboard(fold_idx=0)
+
+        def objective(trial):
+            x = trial.suggest_float("x", 0, 10)
+            return x
+
+        study.optimize(objective, n_trials=3)
+
+        # Load it back
+        loaded = temp_storage.get_study(fold_idx=0)
+        assert loaded is not None
+        assert len(loaded.trials) == 3
+
+    def test_get_nonexistent_study(self, temp_storage):
+        """Test getting a study that doesn't exist returns None"""
+        result = temp_storage.get_study(fold_idx=999)
+        assert result is None
+
+    def test_delete_study(self, temp_storage):
+        """Test deleting a study"""
+        temp_storage.create_study_with_dashboard(fold_idx=0)
+
+        # Verify it exists
+        summaries = temp_storage.list_studies()
+        assert len(summaries) == 1
+
+        # Delete it
+        result = temp_storage.delete_study(fold_idx=0)
+        assert result is True
+
+        # Verify it's gone
+        summaries = temp_storage.list_studies()
+        assert len(summaries) == 0
+
+    def test_delete_nonexistent_study(self, temp_storage):
+        """Test deleting nonexistent study returns False"""
+        result = temp_storage.delete_study(fold_idx=999)
+        assert result is False
+
+    def test_delete_all_studies(self, temp_storage):
+        """Test deleting all Maestro studies"""
+        # Create multiple studies
+        temp_storage.create_study_with_dashboard(fold_idx=0)
+        temp_storage.create_study_with_dashboard(fold_idx=1)
+        temp_storage.create_study_with_dashboard(fold_idx=2)
+
+        # Delete all
+        deleted = temp_storage.delete_all_studies()
+        assert deleted == 3
+
+        # Verify all gone
+        summaries = temp_storage.list_studies()
+        assert len(summaries) == 0
+
+    def test_create_study_with_dashboard_module_function(self, tmp_path):
+        """Test module-level create_study_with_dashboard function"""
+        db_path = str(tmp_path / "module_test.db")
+        storage_url = f"sqlite:///{db_path}"
+
+        study = create_study_with_dashboard(
+            fold_idx=0,
+            storage_url=storage_url,
+        )
+
+        assert study.study_name == "maestro_fold_0"
+
+        # Verify persistence
+        study2 = create_study_with_dashboard(
+            fold_idx=0,
+            storage_url=storage_url,
+            load_if_exists=True,
+        )
+        assert study2.study_name == "maestro_fold_0"
+
+    def test_study_with_custom_sampler(self, temp_storage):
+        """Test creating study with custom sampler"""
+        from optuna.samplers import RandomSampler
+
+        sampler = RandomSampler(seed=123)
+        study = temp_storage.create_study_with_dashboard(
+            fold_idx=0, sampler=sampler
+        )
+
+        assert isinstance(study.sampler, RandomSampler)
+
+    def test_study_with_custom_pruner(self, temp_storage):
+        """Test creating study with custom pruner"""
+        from optuna.pruners import HyperbandPruner
+
+        pruner = HyperbandPruner()
+        study = temp_storage.create_study_with_dashboard(
+            fold_idx=0, pruner=pruner
+        )
+
+        assert isinstance(study.pruner, HyperbandPruner)
+
+    def test_study_minimize_direction(self, temp_storage):
+        """Test creating study with minimize direction"""
+        study = temp_storage.create_study_with_dashboard(
+            fold_idx=0, direction="minimize"
+        )
+
+        assert study.direction == optuna.study.StudyDirection.MINIMIZE
+
+    def test_study_name_override(self, temp_storage):
+        """Test overriding default study name"""
+        study = temp_storage.create_study_with_dashboard(
+            fold_idx=0, study_name_override="custom_study_name"
+        )
+
+        assert study.study_name == "custom_study_name"
+
+
+class TestWalkForwardWithDashboardStorage:
+    """Tests for walk-forward optimization with dashboard storage"""
+
+    def test_walkforward_uses_dashboard_storage(self, small_data, tmp_path):
+        """Test walk-forward uses SQLite storage when enabled"""
+        db_path = str(tmp_path / "wf_test.db")
+        storage_url = f"sqlite:///{db_path}"
+
+        strategy = RSIStrategy()
+        config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=3,
+            use_dashboard_storage=True,
+            storage_url=storage_url,
+        )
+
+        engine = WalkForwardOptuna(
+            data=small_data,
+            strategy=strategy,
+            config=config,
+        )
+
+        result = engine.run()
+
+        # Check that studies were created
+        summaries = optuna.get_all_study_summaries(storage=storage_url)
+        assert len(summaries) > 0
+
+        # Study names should follow convention
+        names = [s.study_name for s in summaries]
+        assert any(name.startswith("maestro_fold_") for name in names)
+
+    def test_walkforward_without_dashboard_storage(self, small_data):
+        """Test walk-forward without dashboard storage (in-memory)"""
+        strategy = RSIStrategy()
+        config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=3,
+            use_dashboard_storage=False,  # Disable SQLite storage
+        )
+
+        engine = WalkForwardOptuna(
+            data=small_data,
+            strategy=strategy,
+            config=config,
+        )
+
+        result = engine.run()
+
+        # Should still produce valid results
+        assert len(result.fold_results) > 0
+        assert len(result.optimal_params_per_fold) > 0
+
+    def test_walkforward_warm_start_from_previous(self, small_data, tmp_path):
+        """Test walk-forward can warm-start from previous runs"""
+        db_path = str(tmp_path / "warmstart_test.db")
+        storage_url = f"sqlite:///{db_path}"
+
+        strategy = RSIStrategy()
+
+        # First run
+        config1 = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=3,
+            use_dashboard_storage=True,
+            storage_url=storage_url,
+        )
+
+        engine1 = WalkForwardOptuna(
+            data=small_data,
+            strategy=strategy,
+            config=config1,
+        )
+        engine1.run()
+
+        # Count trials after first run
+        summaries1 = optuna.get_all_study_summaries(storage=storage_url)
+        trials_after_first = sum(s.n_trials for s in summaries1)
+
+        # Second run (should warm-start)
+        config2 = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=2,  # Add 2 more trials
+            use_dashboard_storage=True,
+            storage_url=storage_url,
+        )
+
+        engine2 = WalkForwardOptuna(
+            data=small_data,
+            strategy=strategy,
+            config=config2,
+        )
+        engine2.run()
+
+        # Should have more trials now
+        summaries2 = optuna.get_all_study_summaries(storage=storage_url)
+        trials_after_second = sum(s.n_trials for s in summaries2)
+
+        assert trials_after_second > trials_after_first
 
 
 # =============================================================================

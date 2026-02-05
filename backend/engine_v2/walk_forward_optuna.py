@@ -8,27 +8,35 @@ This module provides a modernized walk-forward optimization engine that:
 4. Provides progress tracking compatible with the original RethinkDB schema
 """
 
-import numpy as np
-import pandas as pd
-from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, List, Callable, Type, Tuple
-from datetime import datetime, timedelta
-from threading import Thread
-from enum import Enum
-import logging
 import json
-import traceback
-
-import optuna
-from optuna.pruners import MedianPruner, HyperbandPruner
-from optuna.samplers import TPESampler
-
-from .vectorbt_engine import VectorBTEngine, BacktestConfig, BacktestResult, calculate_vwr
-from .strategy_adapter import VectorBTStrategy, SignalOutput
+import logging
+import os
 
 # Import the original TimeSeriesSplitRolling for compatibility
 import sys
-import os
+import traceback
+from collections.abc import Callable
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from threading import Thread
+from typing import Any, Dict, List, Optional, Tuple, Type
+
+import numpy as np
+import optuna
+import pandas as pd
+from optuna.pruners import HyperbandPruner, MedianPruner
+from optuna.samplers import TPESampler
+
+from .optuna_dashboard_storage import (
+    OptunaDashboardStorage,
+    create_study_with_dashboard,
+    get_default_storage_path,
+    get_storage_url,
+)
+from .strategy_adapter import SignalOutput, VectorBTStrategy
+from .vectorbt_engine import BacktestConfig, BacktestResult, VectorBTEngine, calculate_vwr
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.time_series_split_rolling import TimeSeriesSplitRolling
 
@@ -47,32 +55,36 @@ class WalkForwardConfig:
     train_splits: int = 2  # Number of folds for training (rolling window)
     test_splits: int = 1   # Number of folds for testing
     fixed_length: bool = True  # Use fixed-length training windows
-    
+
     # Optuna optimization settings
     n_trials: int = 100  # Number of Optuna trials per fold
     optimization_metric: str = 'sharpe_ratio'  # Metric to optimize
     use_vwr_ranking: bool = True  # Use combined Sharpe + VWR ranking (matches V1)
     pruning_enabled: bool = True
     n_startup_trials: int = 10  # Trials before pruning kicks in
-    
+
     # Early stopping
     early_stopping_rounds: int = 20  # Stop if no improvement
-    
+
     # Parallelization
     n_jobs: int = 1  # Number of parallel jobs for Optuna
+
+    # Dashboard storage
+    use_dashboard_storage: bool = True  # Store studies in SQLite for dashboard
+    storage_url: str = None  # SQLite URL (auto-generated if None)
 
 
 @dataclass
 class WalkForwardResult:
     """Results from walk-forward optimization"""
-    fold_results: List[BacktestResult]
-    optimal_params_per_fold: List[Dict[str, Any]]
+    fold_results: list[BacktestResult]
+    optimal_params_per_fold: list[dict[str, Any]]
     combined_equity_curve: pd.Series = None
-    aggregate_metrics: Dict[str, float] = field(default_factory=dict)
-    
+    aggregate_metrics: dict[str, float] = field(default_factory=dict)
+
     # Timing
     total_processing_time: float = 0.0
-    
+
     def __post_init__(self):
         """Calculate aggregate metrics from fold results"""
         if self.fold_results:
@@ -114,7 +126,7 @@ class WalkForwardOptuna(Thread):
         result = engine.run()
         print(f"Walk-forward result: {result.aggregate_metrics}")
     """
-    
+
     def __init__(
         self,
         data: pd.DataFrame,
@@ -123,7 +135,7 @@ class WalkForwardOptuna(Thread):
         backtest_config: BacktestConfig = None,
         progress_callback: Callable[[int, int, str], None] = None,
         logger: logging.Logger = None,
-        
+
         # Original engine compatibility
         tid: str = None,
         test_name: str = None,
@@ -148,32 +160,32 @@ class WalkForwardOptuna(Thread):
             optimization_output: Output configuration
         """
         super().__init__(name=f'wf_optuna_{test_name or ""}')
-        
+
         self.data = data
         self.strategy = strategy
         self.config = config or WalkForwardConfig()
         self.backtest_config = backtest_config or BacktestConfig()
         self.progress_callback = progress_callback
         self.logger = logger or logging.getLogger(__name__)
-        
+
         # Original compatibility
         self.tid = tid
         self.test_name = test_name
         self.rethinkdb_config = rethinkdb_config
         self.optimization_output = optimization_output
-        
+
         # State
         self.cur_fold = 0
         self.total_folds = self.config.num_splits
-        self._result: Optional[WalkForwardResult] = None
+        self._result: WalkForwardResult | None = None
         self._running = False
-        
+
         # VectorBT engine
         self.vbt_engine = VectorBTEngine(
             config=self.backtest_config,
             logger=self.logger
         )
-    
+
     def run(self) -> WalkForwardResult:
         """
         Execute walk-forward optimization.
@@ -183,17 +195,17 @@ class WalkForwardOptuna(Thread):
         """
         self._running = True
         start_time = datetime.utcnow()
-        
+
         self.logger.info(f"Starting walk-forward optimization with {self.config.num_splits} splits")
-        
+
         # Initialize TimeSeriesSplitRolling (same as original)
         tscv = TimeSeriesSplitRolling(self.config.num_splits)
-        
+
         # Validate split configuration
         n_folds = self.config.num_splits + 1
         train_splits = self.config.train_splits
         test_splits = self.config.test_splits
-        
+
         # Ensure we have enough folds for the configuration
         if n_folds <= train_splits + test_splits:
             self.logger.warning(
@@ -203,55 +215,55 @@ class WalkForwardOptuna(Thread):
             )
             self.config.num_splits = train_splits + test_splits
             tscv = TimeSeriesSplitRolling(self.config.num_splits)
-        
+
         splits = list(tscv.split(
             self.data,
             fixed_length=self.config.fixed_length,
             train_splits=self.config.train_splits,
             test_splits=self.config.test_splits
         ))
-        
+
         self.total_folds = len(splits)
         fold_results = []
         optimal_params_per_fold = []
-        
+
         for fold_idx, (train_idx, test_idx) in enumerate(splits):
             if not self._running:
                 break
-                
+
             self.cur_fold = fold_idx + 1
             self._update_progress(f"Processing fold {self.cur_fold}/{self.total_folds}")
-            
+
             try:
                 # Get train/test data
                 train_data = self.data.iloc[train_idx].copy()
                 test_data = self.data.iloc[test_idx].copy()
-                
+
                 self.logger.info(
                     f"Fold {fold_idx}: Train {len(train_data)} bars "
                     f"({train_data.index[0]} to {train_data.index[-1]}), "
                     f"Test {len(test_data)} bars"
                 )
-                
+
                 # TRAINING: Optimize parameters with Optuna
                 optimal_params = self._optimize_fold(train_data, fold_idx)
                 optimal_params_per_fold.append(optimal_params)
-                
+
                 # TESTING: Evaluate on test data with optimal params
                 test_result = self._backtest_with_params(test_data, optimal_params)
                 test_result.parameters = optimal_params
                 fold_results.append(test_result)
-                
+
                 self.logger.info(
                     f"Fold {fold_idx} result: Sharpe={test_result.sharpe_ratio:.3f}, "
                     f"Return={test_result.total_return:.2%}, Trades={test_result.num_trades}"
                 )
-                
+
                 # Save to RethinkDB if configured
                 if self.rethinkdb_config:
                     self._save_fold_result(fold_idx, test_result, optimal_params)
-                    
-            except Exception as e:
+
+            except Exception:
                 self.logger.error(f"Error in fold {fold_idx}: {traceback.format_exc()}")
                 # Add empty result for failed fold
                 fold_results.append(BacktestResult(
@@ -260,25 +272,25 @@ class WalkForwardOptuna(Thread):
                     annual_return=0, volatility=0, calmar_ratio=0, sortino_ratio=0
                 ))
                 optimal_params_per_fold.append(self.strategy.get_params())
-        
+
         # Combine results
         processing_time = (datetime.utcnow() - start_time).total_seconds()
-        
+
         self._result = WalkForwardResult(
             fold_results=fold_results,
             optimal_params_per_fold=optimal_params_per_fold,
             total_processing_time=processing_time,
         )
-        
+
         # Combine equity curves
         self._result.combined_equity_curve = self._combine_equity_curves(fold_results)
-        
+
         self._update_progress(f"Walk-forward complete: {len(fold_results)} folds")
         self.logger.info(f"Walk-forward completed in {processing_time:.2f}s")
-        
+
         return self._result
-    
-    def _optimize_fold(self, train_data: pd.DataFrame, fold_idx: int) -> Dict[str, Any]:
+
+    def _optimize_fold(self, train_data: pd.DataFrame, fold_idx: int) -> dict[str, Any]:
         """
         Optimize strategy parameters on training data using Optuna.
         
@@ -290,24 +302,24 @@ class WalkForwardOptuna(Thread):
             Optimal parameters dict
         """
         param_space = self.strategy.get_param_space()
-        
+
         def objective(trial: optuna.Trial) -> float:
             # Sample parameters from search space
             params = {}
             for param_name, space_def in param_space.items():
                 param_type = space_def[0]
-                
+
                 if param_type == 'int':
                     params[param_name] = trial.suggest_int(param_name, space_def[1], space_def[2])
                 elif param_type == 'float':
                     params[param_name] = trial.suggest_float(param_name, space_def[1], space_def[2])
                 elif param_type == 'categorical':
                     params[param_name] = trial.suggest_categorical(param_name, space_def[1])
-            
+
             # Validate parameter constraints
             if not self._validate_params(params, len(train_data)):
                 return float('-inf')
-            
+
             # Run backtest
             try:
                 result = self._backtest_with_params(train_data, params)
@@ -333,21 +345,35 @@ class WalkForwardOptuna(Thread):
             except Exception as e:
                 self.logger.debug(f"Trial failed: {e}")
                 return float('-inf')
-        
-        # Create Optuna study
+
+        # Create Optuna study - use dashboard storage if enabled
         sampler = TPESampler(seed=42 + fold_idx)
         pruner = MedianPruner(n_startup_trials=self.config.n_startup_trials) if self.config.pruning_enabled else None
-        
-        study = optuna.create_study(
-            direction='maximize',
-            sampler=sampler,
-            pruner=pruner,
-            study_name=f"fold_{fold_idx}"
-        )
-        
+
+        if self.config.use_dashboard_storage:
+            # Use SQLite storage for dashboard visualization
+            storage_url = self.config.storage_url or get_storage_url()
+            study = create_study_with_dashboard(
+                fold_idx=fold_idx,
+                storage_url=storage_url,
+                direction='maximize',
+                load_if_exists=True,
+                sampler=sampler,
+                pruner=pruner,
+            )
+            self.logger.debug(f"Created study maestro_fold_{fold_idx} with storage: {storage_url}")
+        else:
+            # In-memory study (no persistence)
+            study = optuna.create_study(
+                direction='maximize',
+                sampler=sampler,
+                pruner=pruner,
+                study_name=f"fold_{fold_idx}"
+            )
+
         # Suppress Optuna logging
         optuna.logging.set_verbosity(optuna.logging.WARNING)
-        
+
         # Run optimization
         study.optimize(
             objective,
@@ -355,7 +381,7 @@ class WalkForwardOptuna(Thread):
             n_jobs=self.config.n_jobs,
             show_progress_bar=False,
         )
-        
+
         # Get best parameters
         if study.best_trial:
             optimal_params = study.best_trial.params
@@ -367,10 +393,10 @@ class WalkForwardOptuna(Thread):
             # Fall back to defaults if optimization failed
             optimal_params = self.strategy.get_params()
             self.logger.warning(f"Fold {fold_idx} optimization failed, using defaults")
-        
+
         return optimal_params
-    
-    def _validate_params(self, params: Dict[str, Any], data_size: int) -> bool:
+
+    def _validate_params(self, params: dict[str, Any], data_size: int) -> bool:
         """
         Validate that parameters are sensible for the data size.
         
@@ -389,8 +415,8 @@ class WalkForwardOptuna(Thread):
             if isinstance(v, (int, float)) and v <= 0:
                 return False
         return True
-    
-    def _backtest_with_params(self, data: pd.DataFrame, params: Dict[str, Any]) -> BacktestResult:
+
+    def _backtest_with_params(self, data: pd.DataFrame, params: dict[str, Any]) -> BacktestResult:
         """
         Run a backtest with specific parameters.
         
@@ -403,7 +429,7 @@ class WalkForwardOptuna(Thread):
         """
         # Generate signals
         signals = self.strategy.generate_signals(data, params)
-        
+
         # Run backtest
         result = self.vbt_engine.run(
             data=data,
@@ -413,42 +439,42 @@ class WalkForwardOptuna(Thread):
             short_exits=signals.short_exits,
             parameters=params
         )
-        
+
         return result
-    
-    def _combine_equity_curves(self, fold_results: List[BacktestResult]) -> pd.Series:
+
+    def _combine_equity_curves(self, fold_results: list[BacktestResult]) -> pd.Series:
         """Combine equity curves from all folds into a continuous curve"""
         curves = []
         for r in fold_results:
             if r.equity_curve is not None and len(r.equity_curve) > 0:
                 curves.append(r.equity_curve)
-        
+
         if not curves:
             return pd.Series()
-        
+
         # Concatenate and normalize
         combined = pd.concat(curves)
         combined = combined[~combined.index.duplicated(keep='last')]
         combined = combined.sort_index()
-        
+
         return combined
-    
+
     def _update_progress(self, message: str = ""):
         """Update progress via callback"""
         if self.progress_callback:
             self.progress_callback(self.cur_fold, self.total_folds, message)
-        
+
         # Also save to RethinkDB if configured
         if self.rethinkdb_config and self.optimization_output:
             self._save_progress_to_db()
-    
+
     def _save_progress_to_db(self):
         """Save progress to RethinkDB (compatible with original schema)"""
         try:
             from rethinkdb import RethinkDB
             rdb = RethinkDB()
             conn = rdb.connect(**self.rethinkdb_config.__dict__)
-            
+
             progress_record = {
                 'tid': self.tid,
                 'test_name': self.test_name,
@@ -461,26 +487,26 @@ class WalkForwardOptuna(Thread):
                     }
                 }
             }
-            
+
             existing = rdb.table(self.optimization_output.progress).get(self.tid).run(conn)
             if existing:
                 rdb.table(self.optimization_output.progress).get(self.tid).update(progress_record).run(conn)
             else:
                 rdb.table(self.optimization_output.progress).insert(progress_record).run(conn)
-                
+
             conn.close()
         except Exception as e:
             self.logger.debug(f"Failed to save progress to RethinkDB: {e}")
-    
-    def _save_fold_result(self, fold_idx: int, result: BacktestResult, params: Dict[str, Any]):
+
+    def _save_fold_result(self, fold_idx: int, result: BacktestResult, params: dict[str, Any]):
         """Save fold result to RethinkDB (compatible with original schema)"""
         try:
-            from rethinkdb import RethinkDB
             import pytz
-            
+            from rethinkdb import RethinkDB
+
             rdb = RethinkDB()
             conn = rdb.connect(**self.rethinkdb_config.__dict__)
-            
+
             test_record = {
                 'test_timestamp': datetime.utcnow().timestamp() * 1000,
                 'num_split': fold_idx,
@@ -499,7 +525,7 @@ class WalkForwardOptuna(Thread):
                 },
                 'parameters': params,
             }
-            
+
             existing = rdb.table(self.optimization_output.results).get(self.tid).run(conn)
             if existing:
                 rdb.table(self.optimization_output.results).get(self.tid).update({
@@ -507,17 +533,17 @@ class WalkForwardOptuna(Thread):
                         OptimizationType.OPTUNA.value: rdb.row['optimizations'][OptimizationType.OPTUNA.value].append(test_record)
                     }
                 }).run(conn)
-            
+
             conn.close()
         except Exception as e:
             self.logger.debug(f"Failed to save fold result to RethinkDB: {e}")
-    
+
     def stop(self):
         """Stop the optimization"""
         self._running = False
-    
+
     @property
-    def result(self) -> Optional[WalkForwardResult]:
+    def result(self) -> WalkForwardResult | None:
         """Get the result (available after run completes)"""
         return self._result
 
@@ -552,32 +578,32 @@ def run_simple_walkforward(
     min_splits = train_splits + test_splits + 1
     if num_splits < min_splits:
         num_splits = min_splits
-    
+
     config = WalkForwardConfig(
         num_splits=num_splits,
         train_splits=train_splits,
         test_splits=test_splits,
         n_trials=n_trials,
     )
-    
+
     backtest_config = BacktestConfig(
         cash=cash,
         commission=commission,
     )
-    
+
     engine = WalkForwardOptuna(
         data=data,
         strategy=strategy,
         config=config,
         backtest_config=backtest_config,
     )
-    
+
     return engine.run()
 
 
 def compare_strategies(
     data: pd.DataFrame,
-    strategies: List[VectorBTStrategy],
+    strategies: list[VectorBTStrategy],
     num_splits: int = 5,
     n_trials: int = 50,
 ) -> pd.DataFrame:
@@ -594,7 +620,7 @@ def compare_strategies(
         DataFrame with comparison metrics
     """
     results = []
-    
+
     for strategy in strategies:
         wf_result = run_simple_walkforward(
             data=data,
@@ -602,11 +628,11 @@ def compare_strategies(
             num_splits=num_splits,
             n_trials=n_trials,
         )
-        
+
         results.append({
             'strategy': strategy.__class__.__name__,
             **wf_result.aggregate_metrics,
             'processing_time': wf_result.total_processing_time,
         })
-    
+
     return pd.DataFrame(results)

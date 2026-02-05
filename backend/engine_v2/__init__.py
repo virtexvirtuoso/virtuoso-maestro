@@ -5,15 +5,25 @@ Uses VectorBT for vectorized backtesting (100-1000x faster) and Optuna for optim
 Maintains backward compatibility with existing strategy parameters and walk-forward methodology.
 """
 
+from .optuna_dashboard_storage import (
+    OptunaDashboardStorage,
+    create_study_with_dashboard,
+    get_default_storage_path,
+    get_storage_url,
+)
+from .strategy_adapter import StrategyAdapter, VectorBTStrategy
 from .vectorbt_engine import VectorBTEngine
 from .walk_forward_optuna import WalkForwardOptuna
-from .strategy_adapter import StrategyAdapter, VectorBTStrategy
 
 __all__ = [
     'VectorBTEngine',
     'WalkForwardOptuna',
     'StrategyAdapter',
     'VectorBTStrategy',
+    'OptunaDashboardStorage',
+    'create_study_with_dashboard',
+    'get_storage_url',
+    'get_default_storage_path',
 ]
 
 __version__ = '2.0.0'
