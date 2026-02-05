@@ -207,11 +207,11 @@ class Optimization(Resource):
         from engine_v2.vectorbt_engine import BacktestConfig
         from engine_v2.strategy_adapter import STRATEGY_REGISTRY
         from engine_v2.result_converter import convert_v2_to_v1_schema
-        from datafeed.rethinkdb_datafeed_builder import RethinkDBDataFeedBuilder
+        from datafeed.data_adapter import get_adapter
 
-        # Load data from RethinkDB
-        datafeed_builder = RethinkDBDataFeedBuilder(rethinkdb_config=self.rethinkdb_config)
-        df = datafeed_builder.build_dataframe(
+        # Load data via DataAdapter (enables switching data sources without code changes)
+        adapter = get_adapter(config=self.rethinkdb_config, adapter_type='rethinkdb')
+        df = adapter.load_dataframe(
             provider=DataSourceProviders[data['provider']],
             symbol=data['symbol'],
             bin_size=data['bin_size'],
@@ -271,11 +271,11 @@ class Optimization(Resource):
         from engine_v2.walk_forward_optuna import WalkForwardConfig as WFConfig, BacktestConfig
         from engine_v2.strategy_adapter import STRATEGY_REGISTRY
         from engine_v2.result_converter import convert_v2_to_v1_schema, convert_walkforward_v2_to_v1
-        from datafeed.rethinkdb_datafeed_builder import RethinkDBDataFeedBuilder
+        from datafeed.data_adapter import get_adapter
 
-        # Load data from RethinkDB
-        datafeed_builder = RethinkDBDataFeedBuilder(rethinkdb_config=self.rethinkdb_config)
-        df = datafeed_builder.build_dataframe(
+        # Load data via DataAdapter (enables switching data sources without code changes)
+        adapter = get_adapter(config=self.rethinkdb_config, adapter_type='rethinkdb')
+        df = adapter.load_dataframe(
             provider=DataSourceProviders[data['provider']],
             symbol=data['symbol'],
             bin_size=data['bin_size'],
