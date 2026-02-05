@@ -26,10 +26,7 @@
       "dependsOn": [],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Infrastructure",
-        "Foundation"
-      ],
+      "labels": ["Infrastructure", "Foundation"],
       "context": {
         "rationale": "CI/CD is prerequisite for safe iterative development - catches regressions before they reach main",
         "affectedFiles": [
@@ -38,1215 +35,980 @@
           "pyproject.toml (ruff config)",
           "README.md (badge)"
         ],
-        "codeChanges": {
-          "ci.yml": "GitHub Actions workflow with Python 3.11, RethinkDB service, pytest-cov, ruff",
-          "requirements-dev.txt": "pytest>=8.0, pytest-cov>=4.1, ruff>=0.1, mypy>=1.8"
-        },
         "verifyCommands": {
           "local_test": "pytest backend/tests/ --cov=backend -v",
           "local_lint": "ruff check backend/",
           "local_type": "mypy backend/ --ignore-missing-imports",
           "ci_status": "gh pr checks"
-        },
-        "rollbackProcedure": {
-          "command": "git revert HEAD~1 && git push",
-          "notes": "CI files can be safely removed without affecting runtime"
-        },
-        "successCriteria": "CI runs on every PR, all existing tests pass, coverage baseline established"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P0-HEALTH",
       "title": "Phase 0.2: Docker Health Checks",
-      "description": "[Infrastructure][Foundation] Add health checks to docker-compose.yml for RethinkDB and API services. Ensures services are actually ready before dependent services start.",
+      "description": "[Infrastructure][Foundation] Add health checks to docker-compose.yml for RethinkDB and API services.",
       "acceptanceCriteria": [
         "PHASE 0 - READ: Read current docker-compose.yml to understand service structure",
-        "PHASE 0 - HEALTH_RETHINK: Add healthcheck to rethinkdb service: test curl -f http://localhost:8080, interval 10s, timeout 5s, retries 3",
-        "PHASE 0 - HEALTH_API: Add healthcheck to maestro-api: test curl -f http://localhost:5000/strategy/available, interval 30s, timeout 10s, retries 3",
-        "PHASE 0 - DEPENDS_ON: Add depends_on with condition: service_healthy for maestro-api depending on rethinkdb",
+        "PHASE 0 - HEALTH_RETHINK: Add healthcheck to rethinkdb service",
+        "PHASE 0 - HEALTH_API: Add healthcheck to maestro-api",
+        "PHASE 0 - DEPENDS_ON: Add depends_on with condition: service_healthy",
         "TEST - COMPOSE_UP: docker compose down && docker compose up -d",
-        "TEST - WAIT_HEALTHY: docker compose ps - verify all services show (healthy) status",
-        "TEST - RESTART_CYCLE: docker compose restart rethinkdb - verify API waits for healthy DB",
-        "VALIDATE - LOGS: docker compose logs --tail 50 - no startup errors",
-        "VALIDATE - API_CALL: curl localhost:5000/strategy/available | jq",
+        "VALIDATE - LOGS: docker compose logs --tail 50",
         "COMMIT - MSG: git commit -m 'docker: add health checks and service dependencies'"
       ],
       "priority": 2,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P0-CICD"
-      ],
+      "dependsOn": ["MAESTRO-P0-CICD"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Infrastructure",
-        "Foundation"
-      ],
+      "labels": ["Infrastructure", "Foundation"],
       "context": {
-        "affectedFiles": [
-          "docker-compose.yml"
-        ],
-        "codeChanges": {
-          "rethinkdb": "healthcheck: test curl -f http://localhost:8080, interval 10s",
-          "maestro-api": "healthcheck: test curl -f http://localhost:5000/strategy/available, depends_on rethinkdb condition: service_healthy"
-        },
+        "affectedFiles": ["docker-compose.yml"],
         "verifyCommands": {
           "compose_up": "docker compose up -d",
-          "check_health": "docker compose ps",
-          "api_test": "curl localhost:5000/strategy/available"
-        },
-        "rollbackProcedure": {
-          "command": "git checkout docker-compose.yml && docker compose up -d",
-          "notes": "Health checks are additive - removal doesn't break functionality"
-        },
-        "successCriteria": "docker compose up waits for healthy services, failed health check prevents dependent service start"
+          "check_health": "docker compose ps"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P0-PARITY",
       "title": "Phase 0.3: Parity Test Framework",
-      "description": "[Testing][Critical] Create framework for comparing V1 (Backtrader) vs V2 (VectorBT) engine results. Essential for validating that V2 produces equivalent results. Criteria: 2% numerical tolerance, 95% trade alignment, 0.95 equity correlation.",
+      "description": "[Testing][Critical] Create framework for comparing V1 (Backtrader) vs V2 (VectorBT) engine results.",
       "acceptanceCriteria": [
         "PHASE 0 - CREATE_FILE: Create backend/tests/test_engine_parity.py",
-        "PHASE 0 - IMPORTS: Import BacktestingEngine, VectorBTEngine, STRATEGY_REGISTRY, pytest, pandas, numpy",
-        "PHASE 0 - CONFIG_CLASS: Create ParityTestConfig with NUMERICAL_TOLERANCE=0.02, TRADE_ALIGNMENT_THRESHOLD=0.95, EQUITY_CORRELATION_MIN=0.95",
-        "PHASE 0 - COMPARE_FUNC: Create compare_results(v1_result, v2_result) that returns discrepancies dict",
-        "PHASE 0 - SHARPE_CHECK: Compare Sharpe ratios within 2% tolerance using abs(v1-v2)/max(abs(v1),0.001)",
-        "PHASE 0 - TRADE_ALIGN: Implement calculate_trade_alignment() - entry/exit within 1 bar = aligned",
-        "PHASE 0 - EQUITY_CORR: Implement equity curve correlation check using pandas corr()",
-        "PHASE 0 - PARAMETRIZE: Use @pytest.mark.parametrize('strategy_name', list(STRATEGY_REGISTRY.keys()))",
-        "PHASE 0 - SKIP_EXTERNAL: pytest.skip() for FundingRateArbitrage (requires external data)",
-        "PHASE 0 - FIXTURE: Create sample_data fixture with 1 year of ETHBTC 1d data",
-        "PHASE 0 - RUN_V1: Implement run_v1_backtest(strategy_name, data) helper",
-        "PHASE 0 - RUN_V2: Implement run_v2_backtest(strategy_name, data) helper",
-        "TEST - LOCAL: pytest backend/tests/test_engine_parity.py -v --tb=short",
-        "TEST - SINGLE: pytest backend/tests/test_engine_parity.py::test_strategy_parity[EmaCrossStrategy] -v",
-        "VALIDATE - REPORT: Document which strategies pass/fail parity, with diff percentages",
-        "COMMIT - MSG: git commit -m 'test: add V1/V2 parity test framework with 2% tolerance'"
+        "PHASE 0 - CONFIG_CLASS: Create ParityTestConfig with tolerances",
+        "PHASE 0 - COMPARE_FUNC: Create compare_results() function",
+        "TEST - LOCAL: pytest backend/tests/test_engine_parity.py -v",
+        "COMMIT - MSG: git commit -m 'test: add V1/V2 parity test framework'"
       ],
       "priority": 3,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P0-CICD"
-      ],
+      "dependsOn": ["MAESTRO-P0-CICD"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Testing",
-        "Critical"
-      ],
+      "labels": ["Testing", "Critical"],
       "context": {
-        "rationale": "From agent review: 5% tolerance too loose, tightened to 2% + 95% trade alignment",
-        "affectedFiles": [
-          "backend/tests/test_engine_parity.py (new)",
-          "backend/tests/conftest.py (sample_data fixture)"
-        ],
-        "codeChanges": {
-          "test_engine_parity.py": "ParityTestConfig class, compare_results(), calculate_trade_alignment(), parametrized tests",
-          "conftest.py": "sample_data fixture with real OHLCV data"
-        },
+        "affectedFiles": ["backend/tests/test_engine_parity.py (new)"],
         "verifyCommands": {
-          "run_all": "pytest backend/tests/test_engine_parity.py -v",
-          "run_single": "pytest backend/tests/test_engine_parity.py::test_strategy_parity[EmaCrossStrategy] -v",
-          "coverage": "pytest backend/tests/test_engine_parity.py --cov=backend/engine_v2"
-        },
-        "rollbackProcedure": {
-          "command": "rm backend/tests/test_engine_parity.py",
-          "notes": "Test file only - no runtime impact"
-        },
-        "expectedParityResults": {
-          "high_parity": [
-            "EmaCrossStrategy",
-            "RSIStrategy",
-            "MACDStrategy",
-            "BollingerBandsStrategy"
-          ],
-          "medium_parity": [
-            "IchimokuStrategy",
-            "ChannelStrategy",
-            "VWAPStrategy"
-          ],
-          "low_parity_expected": [
-            "FernandoStrategy (0.85)",
-            "GridTradingStrategy (0.80)",
-            "FundingRateArbitrage (0.70)"
-          ]
-        },
-        "successCriteria": "Parity tests exist for all strategies, tests run in CI, clear discrepancy reporting"
+          "run_all": "pytest backend/tests/test_engine_parity.py -v"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P1-VWR",
       "title": "Phase 1.1: Add VWR Metric to V2 Engine",
-      "description": "[Core][BLOCKING] V1 ranks by ['sharpe_ratio', 'vwr'] but V2 only uses Sharpe. VWR (Variability-Weighted Return) prevents overfitting selection. MUST complete before other Phase 1 tasks.",
+      "description": "[Core][BLOCKING] V1 ranks by ['sharpe_ratio', 'vwr'] but V2 only uses Sharpe. VWR prevents overfitting selection.",
       "acceptanceCriteria": [
-        "PHASE 1 - READ_V1: Read backend/engine/optimization_engine.py to find exact VWR calculation",
-        "PHASE 1 - READ_V2: Read backend/engine_v2/vectorbt_engine.py to understand BacktestResult dataclass",
-        "PHASE 1 - ADD_IMPORT: Add 'import numpy as np' if not present",
-        "PHASE 1 - VWR_FUNC: Add calculate_vwr(returns, annualization_factor=365) function",
-        "PHASE 1 - VWR_FORMULA: VWR = mean_return * annualization / (std_dev * sqrt(annualization) * 2.0)",
-        "PHASE 1 - EDGE_CASES: Handle len(returns) < 2 -> return 0.0, std_dev == 0 -> return 0.0",
-        "PHASE 1 - DATACLASS: Add 'vwr: float = 0.0' field to BacktestResult dataclass",
-        "PHASE 1 - COMPUTE_VWR: In run() method, calculate and store result.vwr = calculate_vwr(returns)",
-        "PHASE 1 - RANKING: In walk_forward_optuna.py, update ranking to use ['sharpe_ratio', 'vwr']",
-        "TEST - UNIT: Create backend/tests/test_vwr_calculation.py with known return series",
-        "TEST - PARITY: pytest backend/tests/test_engine_parity.py::test_vwr_parity -v",
-        "VALIDATE - MATCH: VWR must match V1 calculation within 1% tolerance",
-        "COMMIT - MSG: git commit -m 'feat(engine_v2): add VWR metric for overfitting prevention'"
+        "PHASE 1 - VWR_FUNC: Add calculate_vwr() function",
+        "PHASE 1 - DATACLASS: Add 'vwr: float' to BacktestResult",
+        "PHASE 1 - RANKING: Update ranking to use ['sharpe_ratio', 'vwr']",
+        "TEST - UNIT: Create test_vwr_calculation.py",
+        "COMMIT - MSG: git commit -m 'feat(engine_v2): add VWR metric'"
       ],
       "priority": 4,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P0-PARITY"
-      ],
+      "dependsOn": ["MAESTRO-P0-PARITY"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Core",
-        "BLOCKING"
-      ],
+      "labels": ["Core", "BLOCKING"],
       "context": {
-        "rationale": "Agent review: 'VWR metric missing in V2 = silent methodology degradation'",
-        "affectedFiles": [
-          "backend/engine_v2/vectorbt_engine.py",
-          "backend/engine_v2/walk_forward_optuna.py",
-          "backend/tests/test_vwr_calculation.py (new)"
-        ],
-        "codeChanges": {
-          "vectorbt_engine.py": "calculate_vwr() function, vwr field in BacktestResult, vwr computation in run()",
-          "walk_forward_optuna.py": "ranking = ['sharpe_ratio', 'vwr'] instead of just sharpe"
-        },
-        "vwrFormula": "VWR = (mean_return * 365) / (std_dev * sqrt(365) * tau) where tau=2.0",
+        "affectedFiles": ["backend/engine_v2/vectorbt_engine.py", "backend/engine_v2/walk_forward_optuna.py"],
         "verifyCommands": {
-          "test_vwr": "pytest backend/tests/test_vwr_calculation.py -v",
-          "test_parity": "pytest backend/tests/test_engine_parity.py -k vwr -v"
-        },
-        "rollbackProcedure": {
-          "command": "git revert HEAD && pip install -e .",
-          "notes": "VWR is additive - removal doesn't break existing functionality"
-        },
-        "successCriteria": "VWR calculated identically to V1 within 1%, V2 ranking uses ['sharpe_ratio', 'vwr']"
+          "test_vwr": "pytest backend/tests/test_vwr_calculation.py -v"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P1-API",
       "title": "Phase 1.2: REST API V2 Routing",
-      "description": "[Core][BLOCKING] Current rest_api.py has NO mechanism to route to V2 engine. Add engine_version parameter to /optimization/new/ endpoint.",
+      "description": "[Core][BLOCKING] Add engine_version parameter to /optimization/new/ endpoint.",
       "acceptanceCriteria": [
-        "PHASE 1 - READ_API: Read backend/main/rest_api.py to understand current Optimization class",
-        "PHASE 1 - ADD_PARAM: Add engine_version = data.get('engine_version', 'v1') to POST handler",
-        "PHASE 1 - V2_ROUTING: Add if engine_version == 'v2': return self._run_v2_optimization(data)",
-        "PHASE 1 - V2_METHOD: Implement _run_v2_optimization() method with V2 engine imports",
-        "PHASE 1 - IMPORTS: from engine_v2.vectorbt_engine import VectorBTEngine",
-        "PHASE 1 - IMPORTS: from engine_v2.walk_forward_optuna import WalkForwardOptuna",
-        "PHASE 1 - IMPORTS: from engine_v2.strategy_adapter import STRATEGY_REGISTRY",
-        "PHASE 1 - VALIDATE_STRATEGY: if strategy not in STRATEGY_REGISTRY: abort(400, error='Strategy not in V2')",
-        "PHASE 1 - FACTORY: Create backend/engine/engine_factory.py with EngineFactory class",
-        "PHASE 1 - FACTORY_METHODS: create_backtest_engine(version), create_walkforward_engine(version)",
-        "TEST - V1_STILL_WORKS: curl -X POST localhost:5000/optimization/new/ -H 'Content-Type: application/json' -d '{\"engine_version\": \"v1\", ...}'",
-        "TEST - V2_WORKS: curl -X POST localhost:5000/optimization/new/ -H 'Content-Type: application/json' -d '{\"engine_version\": \"v2\", ...}'",
-        "VALIDATE - V2_RUNS: V2 optimization completes successfully via API",
-        "VALIDATE - RESULTS: Results returned in V1-compatible schema",
-        "COMMIT - MSG: git commit -m 'feat(api): add engine_version parameter for V2 routing'"
+        "PHASE 1 - ADD_PARAM: Add engine_version parameter",
+        "PHASE 1 - V2_ROUTING: Route to V2 engine when specified",
+        "PHASE 1 - FACTORY: Create engine_factory.py",
+        "TEST - V2_WORKS: Test V2 optimization via API",
+        "COMMIT - MSG: git commit -m 'feat(api): add engine_version parameter'"
       ],
       "priority": 5,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P1-VWR"
-      ],
+      "dependsOn": ["MAESTRO-P1-VWR"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Core",
-        "BLOCKING"
-      ],
+      "labels": ["Core", "BLOCKING"],
       "context": {
-        "rationale": "Agent review: 'REST API has no V2 routing - this is blocking work not in original estimates'",
-        "affectedFiles": [
-          "backend/main/rest_api.py",
-          "backend/engine/engine_factory.py (new)"
-        ],
-        "codeChanges": {
-          "rest_api.py": "engine_version param, _run_v2_optimization() method, V2 imports",
-          "engine_factory.py": "EngineFactory class with create_backtest_engine(), create_walkforward_engine()"
-        },
+        "affectedFiles": ["backend/main/rest_api.py", "backend/engine/engine_factory.py (new)"],
         "verifyCommands": {
-          "v1_test": "curl -X POST localhost:5000/optimization/new/ -H 'Content-Type: application/json' -d '{\"engine_version\": \"v1\", \"strategy\": \"EmaCrossStrategy\", ...}'",
-          "v2_test": "curl -X POST localhost:5000/optimization/new/ -H 'Content-Type: application/json' -d '{\"engine_version\": \"v2\", \"strategy\": \"EmaCrossStrategy\", ...}'",
-          "check_progress": "curl localhost:5000/optimization/progress/<tid>"
-        },
-        "rollbackProcedure": {
-          "command": "git revert HEAD && docker compose restart maestro-api",
-          "notes": "V2 routing is opt-in, V1 remains default"
-        },
-        "successCriteria": "/optimization/new/ accepts engine_version: v2, V2 runs via API, results in V1 schema"
+          "v2_test": "curl -X POST localhost:5000/optimization/new/ -d '{\"engine_version\": \"v2\"}'"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P1-RESULT",
       "title": "Phase 1.3: Result Schema Compatibility",
-      "description": "[Core] Create result_converter.py to convert V2 (VectorBT) results to V1 schema for frontend compatibility. Ensures existing frontend displays V2 results correctly.",
+      "description": "[Core] Create result_converter.py to convert V2 results to V1 schema for frontend compatibility.",
       "acceptanceCriteria": [
-        "PHASE 1 - CREATE_FILE: Create backend/engine_v2/result_converter.py",
-        "PHASE 1 - CONVERT_FUNC: def convert_v2_to_v1_schema(result: BacktestResult) -> Dict[str, Any]",
-        "PHASE 1 - ANALYZERS: Map result.sharpe_ratio -> analyzers.PyFolio['Sharpe ratio']",
-        "PHASE 1 - ANALYZERS: Map result.annual_return -> analyzers.PyFolio['Annual return']",
-        "PHASE 1 - ANALYZERS: Map result.volatility -> analyzers.PyFolio['Annual volatility']",
-        "PHASE 1 - ANALYZERS: Map result.max_drawdown -> analyzers.PyFolio['Max drawdown']",
-        "PHASE 1 - ANALYZERS: Map result.vwr -> analyzers.PyFolio['VWR'] (new field)",
-        "PHASE 1 - TRADE_ANALYZER: Map result.num_trades -> analyzers.TradeAnalyzer.total.total",
-        "PHASE 1 - OBSERVERS: Create extract_buysell_from_v2() for buy/sell chart markers",
-        "PHASE 1 - BUYSELL: buys = [[timestamp_ms, price], ...], sells = [[timestamp_ms, price], ...]",
-        "PHASE 1 - TIMESTAMPS: Convert datetime to timestamp_ms: int(ts.timestamp() * 1000)",
-        "PHASE 1 - INTEGRATE: Use converter in _run_v2_optimization() before returning results",
-        "TEST - SCHEMA: Create backend/tests/test_result_converter.py with schema validation",
-        "TEST - FRONTEND: Load V2 results in frontend, verify charts render correctly",
-        "VALIDATE - BUYSELL: Buy/sell markers appear on chart at correct positions",
-        "VALIDATE - METRICS: All metrics display in results panel",
-        "COMMIT - MSG: git commit -m 'feat(engine_v2): add result converter for V1 schema compatibility'"
+        "PHASE 1 - CONVERT_FUNC: Create convert_v2_to_v1_schema()",
+        "PHASE 1 - ANALYZERS: Map all metric fields",
+        "PHASE 1 - OBSERVERS: Extract buysell markers",
+        "TEST - SCHEMA: Create test_result_converter.py",
+        "COMMIT - MSG: git commit -m 'feat(engine_v2): add result converter'"
       ],
       "priority": 6,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P1-API"
-      ],
+      "dependsOn": ["MAESTRO-P1-API"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Core"
-      ],
+      "labels": ["Core"],
       "context": {
-        "affectedFiles": [
-          "backend/engine_v2/result_converter.py (new)",
-          "backend/tests/test_result_converter.py (new)"
-        ],
-        "v1Schema": {
-          "analyzers": {
-            "PyFolio": {
-              "Sharpe ratio": "float",
-              "Annual return": "float",
-              "Max drawdown": "float"
-            },
-            "TradeAnalyzer": {
-              "total": {
-                "total": "int"
-              }
-            }
-          },
-          "observers": {
-            "BuySell": {
-              "buy": "[[ts_ms, price], ...]",
-              "sell": "[[ts_ms, price], ...]"
-            }
-          },
-          "start_date": "timestamp_ms",
-          "end_date": "timestamp_ms"
-        },
+        "affectedFiles": ["backend/engine_v2/result_converter.py (new)"],
         "verifyCommands": {
-          "test_converter": "pytest backend/tests/test_result_converter.py -v",
-          "test_frontend": "Open http://localhost:3000, run V2 optimization, verify chart renders"
-        },
-        "rollbackProcedure": {
-          "command": "Remove result_converter.py, use raw V2 results",
-          "notes": "Frontend may not display correctly without conversion"
-        },
-        "successCriteria": "V2 results display correctly in frontend, charts render, Excel export works"
+          "test_converter": "pytest backend/tests/test_result_converter.py -v"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P1-DATA",
       "title": "Phase 1.4: Data Adapter Layer",
-      "description": "[Core] Create abstraction layer for data sources to enable switching between RethinkDB (V1), Parquet (cache), and QuestDB (V2) without code changes.",
+      "description": "[Core] Create abstraction layer for data sources to enable switching between RethinkDB, Parquet, and QuestDB.",
       "acceptanceCriteria": [
-        "PHASE 1 - CREATE_FILE: Create backend/datafeed/data_adapter.py",
-        "PHASE 1 - ABC: from abc import ABC, abstractmethod",
-        "PHASE 1 - BASE_CLASS: class DataAdapter(ABC) with load_dataframe(), is_available() abstract methods",
-        "PHASE 1 - RETHINK: class RethinkDBAdapter(DataAdapter) wrapping existing RethinkDBDataFeedBuilder",
-        "PHASE 1 - PARQUET: class ParquetAdapter(DataAdapter) for Parquet file cache (Phase 2 prep)",
-        "PHASE 1 - QUESTDB: class QuestDBAdapter(DataAdapter) stub for Phase 2",
-        "PHASE 1 - FACTORY: Create get_adapter(config) factory function that returns appropriate adapter",
-        "PHASE 1 - INTEGRATION: Update VectorBTEngine to use DataAdapter instead of direct RethinkDB",
-        "TEST - RETHINK: pytest backend/tests/test_data_adapter.py::test_rethinkdb_adapter",
-        "TEST - PARQUET: pytest backend/tests/test_data_adapter.py::test_parquet_adapter",
-        "VALIDATE - V2_USES: V2 engine loads data via adapter",
-        "VALIDATE - SAME_DATA: Data from adapter matches direct RethinkDB query",
-        "COMMIT - MSG: git commit -m 'refactor(datafeed): add DataAdapter abstraction layer'"
+        "PHASE 1 - BASE_CLASS: Create DataAdapter ABC",
+        "PHASE 1 - RETHINK: Create RethinkDBAdapter",
+        "PHASE 1 - PARQUET: Create ParquetAdapter stub",
+        "TEST - RETHINK: Test adapter functionality",
+        "COMMIT - MSG: git commit -m 'refactor(datafeed): add DataAdapter abstraction'"
       ],
       "priority": 7,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P1-RESULT"
-      ],
+      "dependsOn": ["MAESTRO-P1-RESULT"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Core",
-        "Phase2-Prep"
-      ],
+      "labels": ["Core", "Phase2-Prep"],
       "context": {
-        "rationale": "Abstraction enables gradual Phase 2 migration without breaking changes",
-        "affectedFiles": [
-          "backend/datafeed/data_adapter.py (new)",
-          "backend/engine_v2/vectorbt_engine.py (use adapter)",
-          "backend/tests/test_data_adapter.py (new)"
-        ],
+        "affectedFiles": ["backend/datafeed/data_adapter.py (new)"],
         "verifyCommands": {
-          "test_adapters": "pytest backend/tests/test_data_adapter.py -v",
-          "integration": "Run V2 backtest, verify data loads correctly"
-        },
-        "rollbackProcedure": {
-          "command": "Revert VectorBTEngine to direct RethinkDB access",
-          "notes": "Adapter is transparent - removal returns to original behavior"
-        },
-        "successCriteria": "V2 uses DataAdapter, same data as direct access, Parquet/QuestDB stubs ready"
+          "test_adapters": "pytest backend/tests/test_data_adapter.py -v"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P2-QUESTDB",
       "title": "Phase 2.1: QuestDB Setup and Configuration",
-      "description": "[Data][Infrastructure] Add QuestDB time-series database to docker-compose with connection pooling. QuestDB provides 10-100x faster queries than RethinkDB for OHLCV data.",
+      "description": "[Data][Infrastructure] Add QuestDB time-series database to docker-compose with connection pooling.",
       "acceptanceCriteria": [
-        "PHASE 2 - DOCKER: Add questdb service to docker-compose.yml",
-        "PHASE 2 - PORTS: Expose 9000 (web), 8812 (PostgreSQL), 9009 (ILP)",
-        "PHASE 2 - VOLUME: Add questdb-data volume for persistence",
-        "PHASE 2 - ENV: QDB_PG_USER=admin, QDB_PG_PASSWORD=quest",
-        "PHASE 2 - HEALTH: healthcheck curl -f http://localhost:9000/health, interval 10s",
-        "PHASE 2 - CREATE_FILE: Create backend/storage/questdb_storage_layer.py",
-        "PHASE 2 - POOL: Use psycopg2.pool.ThreadedConnectionPool with min=2, max=10",
-        "PHASE 2 - CONTEXT: Implement get_connection() context manager",
-        "PHASE 2 - CREATE_TABLE: create_trade_table() with TIMESTAMP partition by DAY",
-        "PHASE 2 - ILP_INGEST: ingest_dataframe() using InfluxDB Line Protocol for speed",
-        "PHASE 2 - QUERY: query_ohlcv() with time range filtering",
-        "TEST - COMPOSE_UP: docker compose up questdb -d",
-        "TEST - WEB_CONSOLE: Open http://localhost:9000 - QuestDB console loads",
-        "TEST - PG_CONNECT: psql -h localhost -p 8812 -U admin -d qdb",
-        "VALIDATE - STORAGE: Create test table, insert 1000 rows, query back",
-        "COMMIT - MSG: git commit -m 'feat(data): add QuestDB with connection pooling'"
+        "PHASE 2 - DOCKER: Add questdb service",
+        "PHASE 2 - CREATE_FILE: Create questdb_storage_layer.py",
+        "PHASE 2 - POOL: Implement connection pooling",
+        "TEST - WEB_CONSOLE: Verify QuestDB console loads",
+        "COMMIT - MSG: git commit -m 'feat(data): add QuestDB'"
       ],
       "priority": 8,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P1-DATA"
-      ],
+      "dependsOn": ["MAESTRO-P1-DATA"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Data",
-        "Infrastructure"
-      ],
+      "labels": ["Data", "Infrastructure"],
       "context": {
-        "performanceExpectation": "QuestDB provides 10-100x faster queries for time-series data",
-        "affectedFiles": [
-          "docker-compose.yml",
-          "backend/storage/questdb_storage_layer.py (new)"
-        ],
-        "questdbSchema": {
-          "table": "trade_{PROVIDER}_{symbol}_{binsize}",
-          "columns": "timestamp TIMESTAMP, open DOUBLE, high DOUBLE, low DOUBLE, close DOUBLE, volume DOUBLE",
-          "partitioning": "PARTITION BY DAY on timestamp"
-        },
+        "affectedFiles": ["docker-compose.yml", "backend/storage/questdb_storage_layer.py (new)"],
         "verifyCommands": {
           "compose_up": "docker compose up questdb -d",
-          "health_check": "curl http://localhost:9000/health",
-          "pg_connect": "psql -h localhost -p 8812 -U admin -d qdb -c 'SELECT 1'"
-        },
-        "rollbackProcedure": {
-          "command": "docker compose stop questdb && docker compose rm questdb",
-          "notes": "RethinkDB continues as primary until migration complete"
-        },
-        "successCriteria": "QuestDB running, connection pool working, test queries succeed"
+          "health_check": "curl http://localhost:9000/health"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P2-MIGRATE",
       "title": "Phase 2.2: Data Migration Script with Validation",
-      "description": "[Data][Critical] Create migration script to move data from RethinkDB to QuestDB with dry-run, checksums, and validation. From agent review: MUST validate 100% row match + checksum.",
+      "description": "[Data][Critical] Create migration script to move data from RethinkDB to QuestDB with validation.",
       "acceptanceCriteria": [
-        "PHASE 2 - CREATE_FILE: Create backend/scripts/migrate_rethinkdb_to_questdb.py",
-        "PHASE 2 - ARGPARSE: --dry-run (validate only), --table (single table)",
-        "PHASE 2 - VALIDATOR: MigrationValidator class with calculate_checksum(), validate_migration()",
-        "PHASE 2 - CHECKSUM: SHA256 of timestamp+close+volume columns",
-        "PHASE 2 - VALIDATE: row_count_match, checksum_match, float_precision_issues",
-        "PHASE 2 - PRECISION: Check float diff < 1e-10 for OHLCV columns",
-        "PHASE 2 - MIGRATE: migrate_table() reads RethinkDB, creates QuestDB table, ingests via ILP",
-        "PHASE 2 - BATCH: Process tables one at a time with progress logging",
-        "PHASE 2 - SUMMARY: Log migration summary: N/M tables successful",
-        "TEST - DRY_RUN: python backend/scripts/migrate_rethinkdb_to_questdb.py --dry-run",
-        "TEST - SINGLE: python backend/scripts/migrate_rethinkdb_to_questdb.py --table trade_BINANCE_ethbtc_1d",
-        "TEST - VALIDATE: After migration, query same data from both DBs, compare",
-        "VALIDATE - CHECKSUM: All tables pass checksum validation",
-        "VALIDATE - ROWS: 100% row count match for all tables",
-        "COMMIT - MSG: git commit -m 'feat(migration): add RethinkDB to QuestDB migration with validation'"
+        "PHASE 2 - CREATE_FILE: Create migrate_rethinkdb_to_questdb.py",
+        "PHASE 2 - VALIDATOR: Create MigrationValidator class",
+        "PHASE 2 - DRY_RUN: Support --dry-run mode",
+        "TEST - VALIDATE: Verify checksum validation",
+        "COMMIT - MSG: git commit -m 'feat(migration): add RethinkDB to QuestDB migration'"
       ],
       "priority": 9,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P2-QUESTDB"
-      ],
+      "dependsOn": ["MAESTRO-P2-QUESTDB"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Data",
-        "Critical"
-      ],
+      "labels": ["Data", "Critical"],
       "context": {
-        "rationale": "Agent review: 'Missing rollback strategy, schema mapping undefined - add validation gate'",
-        "affectedFiles": [
-          "backend/scripts/migrate_rethinkdb_to_questdb.py (new)"
-        ],
-        "validationCriteria": {
-          "row_count": "100% match required",
-          "checksum": "SHA256 match on timestamp+close+volume",
-          "float_precision": "Diff < 1e-10 for all OHLCV columns"
-        },
+        "affectedFiles": ["backend/scripts/migrate_rethinkdb_to_questdb.py (new)"],
         "verifyCommands": {
-          "dry_run": "python backend/scripts/migrate_rethinkdb_to_questdb.py --dry-run",
-          "migrate_single": "python backend/scripts/migrate_rethinkdb_to_questdb.py --table trade_BINANCE_ethbtc_1d",
-          "migrate_all": "python backend/scripts/migrate_rethinkdb_to_questdb.py",
-          "validate": "Compare row counts and checksums between both DBs"
-        },
-        "rollbackProcedure": {
-          "command": "QuestDB tables can be dropped; RethinkDB untouched until validation passes",
-          "notes": "Keep RethinkDB running for 30 days post-migration"
-        },
-        "successCriteria": "Dry-run validates 100% row match + checksum, full migration passes validation"
+          "dry_run": "python backend/scripts/migrate_rethinkdb_to_questdb.py --dry-run"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P2-CACHE",
       "title": "Phase 2.3: Parquet Cache Layer",
-      "description": "[Data][Performance] Add local Parquet file cache for OHLCV data. Provides 10-100x faster repeated access than database queries, works offline.",
+      "description": "[Data][Performance] Add local Parquet file cache for OHLCV data with Polars.",
       "acceptanceCriteria": [
-        "PHASE 2 - CREATE_FILE: Create backend/storage/parquet_cache.py",
-        "PHASE 2 - DIR: Create data/cache directory for Parquet files",
-        "PHASE 2 - CLASS: ParquetCache with cache_dir, max_age (1 day default)",
-        "PHASE 2 - IS_CACHED: Check file exists and mtime < max_age",
-        "PHASE 2 - GET: Use Polars lazy scan with filter for efficient date range slicing",
-        "PHASE 2 - PUT: Convert DataFrame to Polars, write with zstd compression",
-        "PHASE 2 - INVALIDATE: Delete specific cache entry",
-        "PHASE 2 - CACHED_ADAPTER: CachedDataAdapter wrapping primary adapter with cache-through",
-        "PHASE 2 - POLARS: import polars as pl for fast read/write",
-        "TEST - CACHE_MISS: First load goes to primary adapter",
-        "TEST - CACHE_HIT: Second load reads from Parquet (check log messages)",
-        "TEST - TIMING: Compare load times: DB vs Parquet (expect 10x+ speedup)",
-        "VALIDATE - COMPRESSION: Parquet file smaller than raw data",
-        "COMMIT - MSG: git commit -m 'feat(cache): add Parquet cache layer with Polars'"
+        "PHASE 2 - CREATE_FILE: Create parquet_cache.py",
+        "PHASE 2 - CACHED_ADAPTER: Create CachedDataAdapter",
+        "TEST - CACHE_HIT: Verify cache hits",
+        "COMMIT - MSG: git commit -m 'feat(cache): add Parquet cache layer'"
       ],
       "priority": 10,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P2-MIGRATE"
-      ],
+      "dependsOn": ["MAESTRO-P2-MIGRATE"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Data",
-        "Performance"
-      ],
+      "labels": ["Data", "Performance"],
       "context": {
-        "performanceExpectation": "10-100x faster than DB queries for cached data",
-        "affectedFiles": [
-          "backend/storage/parquet_cache.py (new)",
-          "data/cache/ (directory)"
-        ],
-        "compression": "zstd compression typically achieves 3-5x reduction",
+        "affectedFiles": ["backend/storage/parquet_cache.py (new)"],
         "verifyCommands": {
-          "test_cache": "pytest backend/tests/test_parquet_cache.py -v",
-          "timing": "python -c 'import time; ... # compare DB vs cache load times'"
-        },
-        "rollbackProcedure": {
-          "command": "rm -rf data/cache && disable cache in config",
-          "notes": "Cache is transparent - removal falls back to primary adapter"
-        },
-        "successCriteria": "Cache hits 10x+ faster than DB, compression working, cache invalidation works"
+          "test_cache": "pytest backend/tests/test_parquet_cache.py -v"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P3-FASTAPI",
       "title": "Phase 3.1: FastAPI Migration",
-      "description": "[API][Major] Create FastAPI app with async endpoints, WebSocket progress, Pydantic validation. Run alongside Flask with nginx routing.",
+      "description": "[API][Major] Create FastAPI app with async endpoints, WebSocket progress, Pydantic validation.",
       "acceptanceCriteria": [
-        "PHASE 3 - CREATE_FILE: Create backend/main/fastapi_app.py",
-        "PHASE 3 - IMPORTS: FastAPI, WebSocket, BackgroundTasks, HTTPException",
-        "PHASE 3 - CORS: Add CORS middleware for frontend access",
-        "PHASE 3 - MODELS: Pydantic models for OptimizationRequest, OptimizationResponse",
-        "PHASE 3 - ENUMS: EngineVersion(v1, v2), OptimizationType(BACKTESTING, WALKFORWARD)",
-        "PHASE 3 - STRATEGIES: GET /api/v2/strategies - list available V2 strategies",
-        "PHASE 3 - PARAMS: GET /api/v2/strategies/{strategy}/params - get default params",
-        "PHASE 3 - CREATE: POST /api/v2/optimization - create optimization job",
-        "PHASE 3 - GET: GET /api/v2/optimization/{tid} - get results",
-        "PHASE 3 - PROGRESS: GET /api/v2/optimization/{tid}/progress - polling fallback",
-        "PHASE 3 - WEBSOCKET: WS /api/v2/optimization/{tid}/ws - real-time progress",
-        "PHASE 3 - CONNECTION_MGR: ConnectionManager class for WebSocket management",
-        "PHASE 3 - BACKGROUND: run_optimization_task() as background task",
-        "PHASE 3 - BROADCAST: Progress callback broadcasts to connected WebSocket clients",
-        "TEST - UVICORN: uvicorn backend.main.fastapi_app:app --port 8000 --reload",
-        "TEST - DOCS: Open http://localhost:8000/docs - Swagger UI loads",
-        "TEST - STRATEGIES: curl http://localhost:8000/api/v2/strategies",
-        "TEST - WEBSOCKET: wscat -c ws://localhost:8000/api/v2/optimization/test/ws",
-        "VALIDATE - ASYNC: Endpoints respond without blocking",
-        "COMMIT - MSG: git commit -m 'feat(api): add FastAPI app with async endpoints and WebSocket'"
+        "PHASE 3 - CREATE_FILE: Create fastapi_app.py",
+        "PHASE 3 - MODELS: Create Pydantic models",
+        "PHASE 3 - WEBSOCKET: Implement WebSocket progress",
+        "TEST - DOCS: Verify Swagger UI loads",
+        "COMMIT - MSG: git commit -m 'feat(api): add FastAPI app'"
       ],
       "priority": 11,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P2-CACHE"
-      ],
+      "dependsOn": ["MAESTRO-P2-CACHE"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "API",
-        "Major"
-      ],
+      "labels": ["API", "Major"],
       "context": {
-        "rationale": "FastAPI provides 2-4x better performance, auto-docs, async support, WebSocket",
-        "affectedFiles": [
-          "backend/main/fastapi_app.py (new)",
-          "requirements.txt (add fastapi, uvicorn, pydantic)"
-        ],
-        "endpointMapping": {
-          "Flask /strategy/available": "FastAPI /api/v2/strategies",
-          "Flask /optimization/new/": "FastAPI /api/v2/optimization",
-          "Flask /optimization/progress/<tid>": "FastAPI /api/v2/optimization/{tid}/progress"
-        },
+        "affectedFiles": ["backend/main/fastapi_app.py (new)"],
         "verifyCommands": {
-          "run_fastapi": "uvicorn backend.main.fastapi_app:app --port 8000 --reload",
-          "test_docs": "curl http://localhost:8000/docs",
-          "test_strategies": "curl http://localhost:8000/api/v2/strategies"
-        },
-        "rollbackProcedure": {
-          "command": "Stop uvicorn, continue using Flask only",
-          "notes": "Flask remains primary until FastAPI validated"
-        },
-        "successCriteria": "FastAPI serves /api/v2/* endpoints, WebSocket progress works, Swagger docs load"
+          "run_fastapi": "uvicorn backend.main.fastapi_app:app --port 8000"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P3-NGINX",
       "title": "Phase 3.2: Nginx Routing Configuration",
-      "description": "[API][Infrastructure] Configure nginx to route between Flask (V1) and FastAPI (V2) APIs. Enables gradual migration without breaking existing frontend.",
+      "description": "[API][Infrastructure] Configure nginx to route between Flask (V1) and FastAPI (V2) APIs.",
       "acceptanceCriteria": [
-        "PHASE 3 - CREATE_DIR: mkdir -p nginx",
         "PHASE 3 - CREATE_FILE: Create nginx/nginx.conf",
-        "PHASE 3 - UPSTREAM_FLASK: upstream flask_api { server maestro-api-v1:5000; }",
-        "PHASE 3 - UPSTREAM_FASTAPI: upstream fastapi_api { server maestro-api-v2:8000; }",
-        "PHASE 3 - V2_ROUTING: location /api/v2/ { proxy_pass http://fastapi_api; }",
-        "PHASE 3 - WS_ROUTING: location ~ ^/api/v2/optimization/[^/]+/ws$ with upgrade headers",
-        "PHASE 3 - WS_TIMEOUT: proxy_read_timeout 86400 for WebSocket connections",
-        "PHASE 3 - DEFAULT: location / { proxy_pass http://flask_api; }",
-        "PHASE 3 - DOCKER: Add nginx service to docker-compose.yml",
-        "PHASE 3 - PORTS: Expose nginx on port 80, internal routing to 5000/8000",
-        "TEST - COMPOSE_UP: docker compose up nginx -d",
-        "TEST - V1_ROUTE: curl http://localhost/strategy/available (Flask)",
-        "TEST - V2_ROUTE: curl http://localhost/api/v2/strategies (FastAPI)",
-        "TEST - WS_ROUTE: wscat -c ws://localhost/api/v2/optimization/test/ws",
-        "VALIDATE - BOTH_WORK: Both V1 and V2 APIs accessible through nginx",
-        "COMMIT - MSG: git commit -m 'infra(nginx): add routing between Flask and FastAPI'"
+        "PHASE 3 - V2_ROUTING: Route /api/v2/ to FastAPI",
+        "PHASE 3 - WS_ROUTING: Configure WebSocket upgrade",
+        "TEST - ROUTES: Verify both APIs accessible",
+        "COMMIT - MSG: git commit -m 'infra(nginx): add routing'"
       ],
       "priority": 12,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P3-FASTAPI"
-      ],
+      "dependsOn": ["MAESTRO-P3-FASTAPI"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "API",
-        "Infrastructure"
-      ],
+      "labels": ["API", "Infrastructure"],
       "context": {
-        "rationale": "Agent review: 'Run Flask + FastAPI on different ports with nginx routing'",
-        "affectedFiles": [
-          "nginx/nginx.conf (new)",
-          "docker-compose.yml (add nginx service)"
-        ],
-        "routingRules": {
-          "/api/v2/*": "FastAPI (port 8000)",
-          "/api/v2/*/ws": "FastAPI WebSocket with upgrade",
-          "/*": "Flask (port 5000)"
-        },
+        "affectedFiles": ["nginx/nginx.conf (new)", "docker-compose.yml"],
         "verifyCommands": {
-          "compose_up": "docker compose up nginx -d",
           "test_v1": "curl http://localhost/strategy/available",
-          "test_v2": "curl http://localhost/api/v2/strategies",
-          "test_ws": "wscat -c ws://localhost/api/v2/optimization/test/ws"
-        },
-        "rollbackProcedure": {
-          "command": "docker compose stop nginx && access services directly on ports",
-          "notes": "Direct access still works without nginx"
-        },
-        "successCriteria": "nginx routes V1 to Flask, V2 to FastAPI, WebSocket connections work"
+          "test_v2": "curl http://localhost/api/v2/strategies"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P3-REACT",
       "title": "Phase 3.3: React 18 In-Place Upgrade",
-      "description": "[Frontend][Major] Upgrade existing frontend from React 16 to React 18. Agent review: Do NOT create new project - upgrade in place to preserve existing functionality.",
+      "description": "[Frontend][Major] Upgrade existing frontend from React 16 to React 18 in place.",
       "acceptanceCriteria": [
-        "PHASE 3 - BACKUP: git stash frontend changes before starting",
-        "PHASE 3 - PACKAGE: Update frontend/package.json dependencies",
-        "PHASE 3 - REACT: react@^18.2.0, react-dom@^18.2.0",
-        "PHASE 3 - QUERY: Add @tanstack/react-query@^5.0.0 for data fetching",
-        "PHASE 3 - ZUSTAND: Add zustand@^4.4.0 for state management",
-        "PHASE 3 - MUI: Upgrade @mui/material@^5.15.0, @emotion/react, @emotion/styled",
-        "PHASE 3 - CREATEROOT: Replace ReactDOM.render() with createRoot().render()",
-        "PHASE 3 - INSTALL: cd frontend && npm install",
-        "PHASE 3 - HOOKS: Convert class components to function components with hooks (incremental)",
-        "PHASE 3 - QUERY_PROVIDER: Wrap app with QueryClientProvider",
-        "TEST - NPM_START: cd frontend && npm start",
-        "TEST - NO_ERRORS: Console shows no React 18 deprecation warnings",
-        "TEST - EXISTING: All existing pages load and function",
-        "VALIDATE - OPTIMIZATION: Create V1 optimization, verify UI works",
-        "VALIDATE - CHARTS: Charts render correctly",
-        "COMMIT - MSG: git commit -m 'feat(frontend): upgrade to React 18 with hooks'"
+        "PHASE 3 - PACKAGE: Update package.json dependencies",
+        "PHASE 3 - CREATEROOT: Replace ReactDOM.render() with createRoot()",
+        "PHASE 3 - QUERY_PROVIDER: Add QueryClientProvider",
+        "TEST - NO_ERRORS: Verify no deprecation warnings",
+        "COMMIT - MSG: git commit -m 'feat(frontend): upgrade to React 18'"
       ],
       "priority": 13,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P3-NGINX"
-      ],
+      "dependsOn": ["MAESTRO-P3-NGINX"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "Major"
-      ],
+      "labels": ["Frontend", "Major"],
       "context": {
-        "rationale": "Agent review: 'Incremental upgrade, NOT new project'",
-        "affectedFiles": [
-          "frontend/package.json",
-          "frontend/src/index.js (createRoot)",
-          "frontend/src/App.js (QueryClientProvider)"
-        ],
-        "dependencies": {
-          "react": "^18.2.0",
-          "react-dom": "^18.2.0",
-          "@tanstack/react-query": "^5.0.0",
-          "zustand": "^4.4.0",
-          "@mui/material": "^5.15.0",
-          "@emotion/react": "^11.11.0",
-          "@emotion/styled": "^11.11.0"
-        },
+        "affectedFiles": ["frontend/package.json", "frontend/src/index.js"],
         "verifyCommands": {
           "install": "cd frontend && npm install",
-          "start": "cd frontend && npm start",
-          "test": "cd frontend && npm test"
-        },
-        "rollbackProcedure": {
-          "command": "git checkout frontend/package.json && npm install",
-          "notes": "Keep git stash of original frontend"
-        },
-        "successCriteria": "React 18 running, createRoot working, existing functionality preserved"
+          "start": "cd frontend && npm start"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P3-WS-PROGRESS",
       "title": "Phase 3.4: WebSocket Progress Hook with Polling Fallback",
-      "description": "[Frontend] Create useOptimizationProgress hook that uses WebSocket with automatic fallback to polling if WebSocket fails.",
+      "description": "[Frontend] Create useOptimizationProgress hook that uses WebSocket with automatic fallback to polling.",
       "acceptanceCriteria": [
-        "PHASE 3 - CREATE_FILE: Create frontend/src/hooks/useOptimizationProgress.ts",
-        "PHASE 3 - INTERFACE: Progress { current, total, percent, message }",
-        "PHASE 3 - STATE: useState for progress, useEffect for connection",
-        "PHASE 3 - WS_URL: ws://${window.location.host}/api/v2/optimization/${tid}/ws",
-        "PHASE 3 - WS_CONNECT: Create WebSocket, handle onmessage",
-        "PHASE 3 - WS_UPDATE: Parse JSON, update progress state on type='progress'",
-        "PHASE 3 - FALLBACK: ws.onerror triggers polling fallback",
-        "PHASE 3 - POLLING: setInterval fetch /api/v2/optimization/{tid}/progress every 2s",
-        "PHASE 3 - CLEANUP: Clear interval, close WebSocket on unmount",
-        "PHASE 3 - COMPLETE: Stop polling when percent >= 100",
-        "TEST - WS_WORKS: Run optimization, verify real-time progress updates",
-        "TEST - POLLING_FALLBACK: Block WebSocket, verify polling takes over",
-        "VALIDATE - PROGRESS_BAR: Progress bar updates smoothly",
-        "COMMIT - MSG: git commit -m 'feat(frontend): add WebSocket progress hook with polling fallback'"
+        "PHASE 3 - CREATE_FILE: Create useOptimizationProgress.ts",
+        "PHASE 3 - WS_CONNECT: Implement WebSocket connection",
+        "PHASE 3 - FALLBACK: Implement polling fallback on error",
+        "TEST - WS_WORKS: Verify real-time updates",
+        "COMMIT - MSG: git commit -m 'feat(frontend): add WebSocket progress hook'"
       ],
       "priority": 14,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P3-REACT"
-      ],
+      "dependsOn": ["MAESTRO-P3-REACT"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Frontend"
-      ],
+      "labels": ["Frontend"],
       "context": {
-        "affectedFiles": [
-          "frontend/src/hooks/useOptimizationProgress.ts (new)"
-        ],
+        "affectedFiles": ["frontend/src/hooks/useOptimizationProgress.ts (new)"],
         "verifyCommands": {
-          "test_ws": "Start optimization, watch console for WebSocket messages",
-          "test_fallback": "Block WS port, verify polling kicks in"
-        },
-        "rollbackProcedure": {
-          "command": "Use existing polling-only implementation",
-          "notes": "Polling fallback ensures functionality even without WebSocket"
-        },
-        "successCriteria": "WebSocket updates in real-time, polling fallback works, cleanup on unmount"
+          "test_ws": "Start optimization, watch console for WebSocket messages"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P3-CHARTS",
       "title": "Phase 3.5: TradingView Charts Migration",
-      "description": "[Frontend][Major] Replace Highcharts with TradingView Lightweight Charts. Budget 2-3 weeks per agent review. Evaluate full TradingView widget if Lightweight lacks features.",
+      "description": "[Frontend][Major] Replace Highcharts with TradingView Lightweight Charts.",
       "acceptanceCriteria": [
-        "PHASE 3 - INSTALL: npm install lightweight-charts@^4.1.0",
-        "PHASE 3 - CREATE_FILE: Create frontend/src/components/TradingChart.tsx",
-        "PHASE 3 - CHART_INIT: createChart() with dark theme configuration",
-        "PHASE 3 - CANDLESTICK: Add CandlestickSeries with upColor/downColor",
-        "PHASE 3 - MARKERS: Add trade markers (buy=arrowUp, sell=arrowDown)",
-        "PHASE 3 - INDICATORS: Add LineSeries for indicator overlays",
-        "PHASE 3 - RESIZE: Handle window resize events",
-        "PHASE 3 - CLEANUP: chart.remove() on component unmount",
-        "PHASE 3 - FEATURE_CHECK: Document feature parity vs Highcharts",
-        "PHASE 3 - MISSING: If flags/multi-pane/range-selector needed, evaluate TradingView widget",
-        "TEST - RENDER: Chart renders with sample data",
-        "TEST - MARKERS: Buy/sell markers appear at correct positions",
-        "TEST - ZOOM: Zoom and pan work correctly",
-        "TEST - RESIZE: Chart resizes with window",
-        "VALIDATE - PARITY: All existing chart features work",
-        "COMMIT - MSG: git commit -m 'feat(frontend): migrate to TradingView Lightweight Charts'"
+        "PHASE 3 - INSTALL: npm install lightweight-charts",
+        "PHASE 3 - CREATE_FILE: Create TradingChart.tsx",
+        "PHASE 3 - CANDLESTICK: Implement candlestick rendering",
+        "PHASE 3 - MARKERS: Add buy/sell markers",
+        "TEST - RENDER: Verify chart renders correctly",
+        "COMMIT - MSG: git commit -m 'feat(frontend): migrate to TradingView'"
       ],
       "priority": 15,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P3-WS-PROGRESS"
-      ],
+      "dependsOn": ["MAESTRO-P3-WS-PROGRESS"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "Major"
-      ],
+      "labels": ["Frontend", "Major"],
       "context": {
-        "rationale": "Agent review: 'Budget 2-3 weeks for charting migration - complexity underestimated'",
-        "affectedFiles": [
-          "frontend/src/components/TradingChart.tsx (new)",
-          "frontend/package.json (add lightweight-charts)"
-        ],
-        "featureParity": {
-          "must_have": [
-            "Candlestick",
-            "Buy/sell markers",
-            "Indicator overlays",
-            "Zoom/pan"
-          ],
-          "nice_to_have": [
-            "Multi-pane",
-            "Range selector",
-            "Flags"
-          ],
-          "evaluate_widget": "If nice-to-have needed, use full TradingView widget"
-        },
+        "affectedFiles": ["frontend/src/components/TradingChart.tsx (new)"],
         "verifyCommands": {
-          "test_chart": "Load optimization result, verify chart renders",
-          "test_markers": "Verify buy/sell markers at correct positions",
-          "test_zoom": "Zoom in/out, pan left/right"
-        },
-        "rollbackProcedure": {
-          "command": "Revert to Highcharts components",
-          "notes": "Keep Highcharts components until charts validated"
-        },
-        "successCriteria": "Candlestick display, buy/sell markers, indicator overlays, zoom/pan controls"
+          "test_chart": "Load optimization result, verify chart renders"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P4-QUANTSTATS",
       "title": "Phase 4.1: QuantStats Integration",
-      "description": "[Analytics] Replace abandoned PyFolio with QuantStats for portfolio analytics. Uses 365-day annualization for crypto (not 252 trading days).",
+      "description": "[Analytics] Replace abandoned PyFolio with QuantStats for portfolio analytics.",
       "acceptanceCriteria": [
-        "PHASE 4 - INSTALL: pip install quantstats>=0.0.62",
-        "PHASE 4 - CREATE_FILE: Create backend/analytics/quantstats_reporter.py",
-        "PHASE 4 - CLASS: QuantStatsReporter with returns, benchmark parameters",
-        "PHASE 4 - ANNUALIZATION: ANNUALIZATION_FACTOR = 365 (crypto 24/7)",
-        "PHASE 4 - METRICS: get_metrics() returning sharpe, sortino, calmar, max_drawdown, win_rate, etc.",
-        "PHASE 4 - HTML_REPORT: generate_html_report() using qs.reports.html()",
-        "PHASE 4 - IMAGES: generate_tearsheet_images() for returns, drawdown, monthly heatmap",
-        "PHASE 4 - BASE64: Convert matplotlib figures to base64 for API response",
-        "PHASE 4 - ENDPOINT: Add GET /api/v2/optimization/{tid}/report endpoint",
-        "TEST - METRICS: Compare QuantStats metrics to manual calculation",
-        "TEST - HTML: Generate HTML report, open in browser",
-        "TEST - IMAGES: Verify tearsheet images render correctly",
-        "VALIDATE - ANNUALIZATION: Sharpe uses 365-day factor, not 252",
-        "COMMIT - MSG: git commit -m 'feat(analytics): add QuantStats integration with 365-day annualization'"
+        "PHASE 4 - INSTALL: pip install quantstats",
+        "PHASE 4 - CREATE_FILE: Create quantstats_reporter.py",
+        "PHASE 4 - ENDPOINT: Add report endpoint",
+        "TEST - HTML: Generate HTML report",
+        "COMMIT - MSG: git commit -m 'feat(analytics): add QuantStats'"
       ],
       "priority": 16,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P3-CHARTS"
-      ],
+      "dependsOn": ["MAESTRO-P3-CHARTS"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Analytics"
-      ],
+      "labels": ["Analytics"],
       "context": {
-        "rationale": "PyFolio abandoned, QuantStats actively maintained with better features",
-        "affectedFiles": [
-          "backend/analytics/quantstats_reporter.py (new)",
-          "backend/main/fastapi_app.py (add report endpoint)",
-          "requirements.txt (add quantstats)"
-        ],
-        "metrics": [
-          "sharpe",
-          "sortino",
-          "calmar",
-          "max_drawdown",
-          "win_rate",
-          "profit_factor",
-          "cagr",
-          "volatility",
-          "skew",
-          "kurtosis",
-          "var",
-          "cvar"
-        ],
+        "affectedFiles": ["backend/analytics/quantstats_reporter.py (new)"],
         "verifyCommands": {
-          "test_reporter": "pytest backend/tests/test_quantstats_reporter.py -v",
-          "test_html": "python -c 'from analytics.quantstats_reporter import ...; print(reporter.generate_html_report())'"
-        },
-        "rollbackProcedure": {
-          "command": "Use existing PyFolio metrics",
-          "notes": "QuantStats is additive - doesn't remove existing functionality"
-        },
-        "successCriteria": "QuantStats metrics accurate, HTML reports generate, 365-day annualization used"
+          "test_reporter": "pytest backend/tests/test_quantstats_reporter.py -v"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P4-OPTUNA-DASH",
       "title": "Phase 4.2: Optuna Dashboard",
-      "description": "[Analytics] Add Optuna's built-in dashboard for optimization visualization. Store studies in SQLite for persistence and visualization.",
+      "description": "[Analytics] Add Optuna's built-in dashboard for optimization visualization.",
       "acceptanceCriteria": [
         "PHASE 4 - INSTALL: pip install optuna-dashboard",
-        "PHASE 4 - STORAGE: Configure sqlite:///optuna_studies.db storage",
-        "PHASE 4 - STUDY_NAME: Use maestro_fold_{fold_idx} naming convention",
-        "PHASE 4 - LOAD_EXISTING: load_if_exists=True for warm-starting",
-        "PHASE 4 - CREATE_FUNC: create_study_with_dashboard(fold_idx, storage_url)",
-        "PHASE 4 - DOCKER: Add optuna-dashboard service to docker-compose.yml",
-        "PHASE 4 - PORT: Expose optuna-dashboard on port 8050",
-        "TEST - DASHBOARD: optuna-dashboard sqlite:///optuna_studies.db --port 8050",
-        "TEST - STUDIES: Run optimization, verify study appears in dashboard",
-        "TEST - PLOTS: View optimization history, parameter importance plots",
-        "VALIDATE - PERSISTENCE: Restart dashboard, studies still visible",
-        "COMMIT - MSG: git commit -m 'feat(analytics): add Optuna dashboard for optimization visualization'"
+        "PHASE 4 - STORAGE: Configure SQLite storage",
+        "PHASE 4 - DOCKER: Add optuna-dashboard service",
+        "TEST - DASHBOARD: Verify dashboard loads",
+        "COMMIT - MSG: git commit -m 'feat(analytics): add Optuna dashboard'"
       ],
       "priority": 17,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P4-QUANTSTATS"
-      ],
+      "dependsOn": ["MAESTRO-P4-QUANTSTATS"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Analytics"
-      ],
+      "labels": ["Analytics"],
       "context": {
-        "affectedFiles": [
-          "backend/engine_v2/walk_forward_optuna.py (add storage)",
-          "docker-compose.yml (add optuna-dashboard service)",
-          "requirements.txt (add optuna-dashboard)"
-        ],
+        "affectedFiles": ["docker-compose.yml", "backend/engine_v2/walk_forward_optuna.py"],
         "verifyCommands": {
-          "run_dashboard": "optuna-dashboard sqlite:///optuna_studies.db --port 8050",
-          "open_dashboard": "Open http://localhost:8050"
-        },
-        "rollbackProcedure": {
-          "command": "Remove optuna-dashboard service, use in-memory studies",
-          "notes": "Dashboard is optional - optimization works without it"
-        },
-        "successCriteria": "Optuna dashboard accessible, studies persist, visualization works"
+          "run_dashboard": "optuna-dashboard sqlite:///optuna_studies.db --port 8050"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P5-PARALLEL",
       "title": "Phase 5.1: Parallelize Walk-Forward Splits",
-      "description": "[Performance][Major] Use ProcessPoolExecutor to parallelize walk-forward splits. Splits are independent after data splitting, enabling 3-4x speedup on multi-core machines.",
+      "description": "[Performance][Major] Use ProcessPoolExecutor to parallelize walk-forward splits.",
       "acceptanceCriteria": [
-        "PHASE 5 - IMPORTS: from concurrent.futures import ProcessPoolExecutor, as_completed",
-        "PHASE 5 - IMPORTS: import multiprocessing as mp",
-        "PHASE 5 - PROCESS_SPLIT: process_single_split(split_idx, train_idx, test_idx, df, strategy, config) function",
-        "PHASE 5 - RETURNS: Return (split_idx, opt_params, test_result) tuple",
-        "PHASE 5 - CLASS: ParallelWalkForward with max_workers parameter",
-        "PHASE 5 - DEFAULT_WORKERS: max(1, mp.cpu_count() - 1)",
-        "PHASE 5 - RUN: Submit all splits to executor, collect as_completed",
-        "PHASE 5 - RESULTS: Store results in order using split_idx",
-        "PHASE 5 - PROGRESS: _on_split_complete() callback for progress tracking",
-        "PHASE 5 - CONFIG: Add parallel.enabled, parallel.max_workers to config yaml",
-        "TEST - SINGLE_CORE: Run with max_workers=1, verify same results as sequential",
-        "TEST - MULTI_CORE: Run with max_workers=4, verify speedup",
-        "TEST - TIMING: Log total time, compare to sequential",
-        "VALIDATE - CORRECTNESS: Results identical to sequential execution",
-        "VALIDATE - SPEEDUP: 3-4x speedup on 4-core machine",
-        "COMMIT - MSG: git commit -m 'perf(engine_v2): parallelize walk-forward splits with ProcessPoolExecutor'"
+        "PHASE 5 - PROCESS_SPLIT: Create process_single_split() function",
+        "PHASE 5 - CLASS: Create ParallelWalkForward class",
+        "TEST - MULTI_CORE: Verify speedup on multi-core",
+        "COMMIT - MSG: git commit -m 'perf(engine_v2): parallelize walk-forward'"
       ],
       "priority": 18,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P4-OPTUNA-DASH"
-      ],
+      "dependsOn": ["MAESTRO-P4-OPTUNA-DASH"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Performance",
-        "Major"
-      ],
+      "labels": ["Performance", "Major"],
       "context": {
-        "expectedSpeedup": "3-4x on 4-core machine",
-        "affectedFiles": [
-          "backend/engine_v2/walk_forward_optuna.py",
-          "backend/maestro-dev.yaml (add parallel config)"
-        ],
-        "configExample": {
-          "optimization.parallel.enabled": true,
-          "optimization.parallel.max_workers": 4,
-          "optimization.parallel.timeout_per_split": 600
-        },
+        "affectedFiles": ["backend/engine_v2/walk_forward_optuna.py"],
         "verifyCommands": {
-          "test_parallel": "pytest backend/tests/test_parallel_walkforward.py -v",
-          "benchmark": "python -c 'from engine_v2.walk_forward_optuna import ...; # timing test'"
-        },
-        "rollbackProcedure": {
-          "command": "Set parallel.enabled: false in config",
-          "notes": "Sequential fallback always available"
-        },
-        "successCriteria": "Results identical to sequential, 3-4x speedup achieved"
+          "test_parallel": "pytest backend/tests/test_parallel_walkforward.py -v"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P5-BAYESIAN",
       "title": "Phase 5.2: Enhanced Bayesian Optimization",
-      "description": "[Performance] Add TPESampler with warm-starting, HyperbandPruner for early stopping, and multi-objective support. Expected 50-80% trial reduction.",
+      "description": "[Performance] Add TPESampler with warm-starting, HyperbandPruner for early stopping.",
       "acceptanceCriteria": [
-        "PHASE 5 - IMPORTS: from optuna.pruners import HyperbandPruner",
-        "PHASE 5 - IMPORTS: from optuna.samplers import TPESampler",
-        "PHASE 5 - SAMPLER: TPESampler(n_startup_trials=10, multivariate=True, seed=42)",
-        "PHASE 5 - PRUNER: HyperbandPruner(min_resource=1, max_resource=10, reduction_factor=3)",
-        "PHASE 5 - STUDY: create_study with sampler, pruner, storage, load_if_exists=True",
-        "PHASE 5 - OBJECTIVE: Add trial.report() for intermediate values",
-        "PHASE 5 - PRUNE_CHECK: if trial.should_prune(): raise optuna.TrialPruned()",
-        "PHASE 5 - CREATE_FUNC: create_optimized_study(strategy_name, n_startup_trials)",
-        "TEST - PRUNING: Run optimization, verify some trials pruned early",
-        "TEST - WARM_START: Run twice, verify second run starts faster",
-        "TEST - TRIAL_COUNT: Compare trial count to grid search",
-        "VALIDATE - REDUCTION: 50-80% fewer trials than grid search",
-        "VALIDATE - QUALITY: Best params as good or better than grid search",
-        "COMMIT - MSG: git commit -m 'perf(engine_v2): add TPE sampler and Hyperband pruner'"
+        "PHASE 5 - SAMPLER: Configure TPESampler",
+        "PHASE 5 - PRUNER: Add HyperbandPruner",
+        "TEST - PRUNING: Verify pruning occurs",
+        "COMMIT - MSG: git commit -m 'perf(engine_v2): add TPE sampler'"
       ],
       "priority": 19,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P5-PARALLEL"
-      ],
+      "dependsOn": ["MAESTRO-P5-PARALLEL"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Performance"
-      ],
+      "labels": ["Performance"],
       "context": {
-        "expectedReduction": "50-80% fewer trials while finding better optima",
-        "affectedFiles": [
-          "backend/engine_v2/walk_forward_optuna.py"
-        ],
+        "affectedFiles": ["backend/engine_v2/walk_forward_optuna.py"],
         "verifyCommands": {
-          "test_bayesian": "pytest backend/tests/test_bayesian_optim.py -v",
-          "compare": "Run same strategy with grid search vs Bayesian, compare trial counts"
-        },
-        "rollbackProcedure": {
-          "command": "Use RandomSampler instead of TPESampler",
-          "notes": "Optimization still works without advanced samplers"
-        },
-        "successCriteria": "50-80% trial reduction, warm-starting works, pruning active"
+          "test_bayesian": "pytest backend/tests/test_bayesian_optim.py -v"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P5-ADAPTIVE",
       "title": "Phase 5.3: Adaptive Window Modes",
-      "description": "[Robustness] Add expanding and adaptive window modes to TimeSeriesSplitRolling. Adaptive mode adjusts window size based on volatility clustering.",
+      "description": "[Robustness] Add expanding and adaptive window modes to TimeSeriesSplitRolling.",
       "acceptanceCriteria": [
-        "PHASE 5 - MODE_PARAM: Add mode parameter: 'rolling' | 'expanding' | 'adaptive'",
-        "PHASE 5 - ROLLING: Existing fixed-size sliding window",
-        "PHASE 5 - EXPANDING: Growing training window from start, fixed test size",
-        "PHASE 5 - ADAPTIVE: Volatility-based dynamic windows (larger in high-vol periods)",
-        "PHASE 5 - VOL_CALC: Calculate 20-day rolling volatility of returns",
-        "PHASE 5 - VOL_MULTIPLIER: Window size = base_size * (0.5 + vol_normalized)",
-        "PHASE 5 - CONFIG: Add walkforward.mode to config yaml",
-        "TEST - ROLLING: Verify rolling mode produces fixed-size windows",
-        "TEST - EXPANDING: Verify expanding mode grows training window",
-        "TEST - ADAPTIVE: Verify adaptive adjusts based on volatility",
-        "VALIDATE - SPLITS: All modes produce valid train/test splits",
-        "COMMIT - MSG: git commit -m 'feat(engine_v2): add expanding and adaptive window modes'"
+        "PHASE 5 - MODE_PARAM: Add mode parameter",
+        "PHASE 5 - EXPANDING: Implement expanding mode",
+        "PHASE 5 - ADAPTIVE: Implement volatility-based adaptive",
+        "TEST - MODES: Verify all modes work",
+        "COMMIT - MSG: git commit -m 'feat(engine_v2): add window modes'"
       ],
       "priority": 20,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P5-BAYESIAN"
-      ],
+      "dependsOn": ["MAESTRO-P5-BAYESIAN"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Robustness"
-      ],
+      "labels": ["Robustness"],
       "context": {
-        "rationale": "Fixed windows may not capture varying market volatility",
-        "affectedFiles": [
-          "backend/utils/time_series_split_rolling.py",
-          "backend/maestro-dev.yaml"
-        ],
-        "modes": {
-          "rolling": "Fixed-size sliding window (original)",
-          "expanding": "Growing training window, simulates accumulating knowledge",
-          "adaptive": "Larger windows in high-volatility periods"
-        },
-        "configExample": {
-          "optimization.walkforward.mode": "rolling",
-          "optimization.walkforward.num_splits": 10,
-          "optimization.walkforward.train_splits": 2
-        },
+        "affectedFiles": ["backend/utils/time_series_split_rolling.py"],
         "verifyCommands": {
           "test_modes": "pytest backend/tests/test_time_series_split.py -v"
-        },
-        "rollbackProcedure": {
-          "command": "Set mode: rolling in config",
-          "notes": "Rolling mode is always default fallback"
-        },
-        "successCriteria": "All three modes produce valid splits, adaptive responds to volatility"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P5-MULTIOBJ",
       "title": "Phase 5.4: Multi-Objective Parameter Selection",
-      "description": "[Robustness] Implement Pareto-based selection using Sharpe, VWR, Sortino, Calmar, and turnover penalty. Selects truly robust parameters, not just single-metric optimizers.",
+      "description": "[Robustness] Implement Pareto-based selection using multiple metrics.",
       "acceptanceCriteria": [
-        "PHASE 5 - CREATE_FILE: Create backend/engine_v2/multi_objective_selector.py",
-        "PHASE 5 - CONFIG: MultiObjectiveConfig dataclass with metrics, weights, method",
-        "PHASE 5 - METRICS: calculate_extended_metrics() for sortino, calmar, turnover_penalty",
-        "PHASE 5 - SORTINO: (mean_return * 252) / downside_std",
-        "PHASE 5 - CALMAR: annual_return / max_drawdown",
-        "PHASE 5 - TURNOVER: -num_trades / len(returns) (penalty)",
-        "PHASE 5 - PARETO: pareto_optimal() finds non-dominated solutions",
-        "PHASE 5 - DOMINATION: j dominates i if j >= i in ALL metrics and j > i in at least one",
-        "PHASE 5 - METHODS: Support 'pareto', 'weighted', 'rank_average' selection",
-        "PHASE 5 - INTEGRATE: Use in walk_forward_optuna for final parameter selection",
-        "TEST - PARETO: Create test cases with known Pareto fronts",
-        "TEST - METRICS: Verify metric calculations match manual",
-        "VALIDATE - ROBUST: Selected params perform well on multiple metrics",
-        "COMMIT - MSG: git commit -m 'feat(engine_v2): add Pareto-based multi-objective selection'"
+        "PHASE 5 - CREATE_FILE: Create multi_objective_selector.py",
+        "PHASE 5 - PARETO: Implement pareto_optimal() function",
+        "TEST - PARETO: Test with known Pareto fronts",
+        "COMMIT - MSG: git commit -m 'feat(engine_v2): add Pareto selection'"
       ],
       "priority": 21,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P5-ADAPTIVE"
-      ],
+      "dependsOn": ["MAESTRO-P5-ADAPTIVE"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Robustness"
-      ],
+      "labels": ["Robustness"],
       "context": {
-        "rationale": "Single-metric optimization can select fragile parameters",
-        "affectedFiles": [
-          "backend/engine_v2/multi_objective_selector.py (new)",
-          "backend/engine_v2/walk_forward_optuna.py (integrate)"
-        ],
-        "metrics": [
-          "sharpe_ratio",
-          "vwr",
-          "sortino_ratio",
-          "calmar_ratio",
-          "turnover_penalty"
-        ],
-        "selectionMethods": {
-          "pareto": "Select from Pareto-optimal set",
-          "weighted": "Weighted sum of normalized metrics",
-          "rank_average": "Average rank across all metrics"
-        },
+        "affectedFiles": ["backend/engine_v2/multi_objective_selector.py (new)"],
         "verifyCommands": {
           "test_multiobj": "pytest backend/tests/test_multi_objective.py -v"
-        },
-        "rollbackProcedure": {
-          "command": "Use single-metric (Sharpe + VWR) ranking",
-          "notes": "Multi-objective is enhancement, not replacement"
-        },
-        "successCriteria": "Pareto selection working, selected params robust across metrics"
+        }
       },
       "completionNotes": "Completed by agent"
     },
     {
       "id": "MAESTRO-P5-CACHE-OPT",
       "title": "Phase 5.5: DataFrame Cache for Walk-Forward",
-      "description": "[Performance] Load data once, slice in-memory for each split. Eliminates repeated DB queries during walk-forward optimization.",
+      "description": "[Performance] Load data once, slice in-memory for each split.",
       "acceptanceCriteria": [
-        "PHASE 5 - CREATE_FILE: Create backend/datafeed/dataframe_cache.py",
-        "PHASE 5 - CLASS: DataFrameCache with data_adapter, _cache dict",
-        "PHASE 5 - GET: get_dataframe() loads once, returns cached on subsequent calls",
-        "PHASE 5 - SLICE_IDX: slice_by_index(df, indices) uses iloc for O(1) slicing",
-        "PHASE 5 - SLICE_DATE: slice_by_date(df, start, end) uses loc for datetime index",
-        "PHASE 5 - CLEAR: clear() frees memory by clearing cache",
-        "PHASE 5 - MEMORY: memory_usage() returns total bytes in cache",
-        "PHASE 5 - INTEGRATE: Use in walk_forward_optuna to avoid repeated loads",
-        "TEST - CACHE_HIT: Second get_dataframe() returns cached data",
-        "TEST - SLICING: slice_by_index produces correct subsets",
-        "TEST - MEMORY: Verify memory_usage() tracks correctly",
-        "VALIDATE - NO_QUERIES: During walk-forward, only 1 DB query for full load",
-        "VALIDATE - SPEEDUP: 2-10x speedup for data-heavy operations",
-        "COMMIT - MSG: git commit -m 'perf(datafeed): add DataFrame cache for walk-forward'"
+        "PHASE 5 - CREATE_FILE: Create dataframe_cache.py",
+        "PHASE 5 - SLICE_IDX: Implement slice_by_index()",
+        "TEST - CACHE_HIT: Verify caching works",
+        "COMMIT - MSG: git commit -m 'perf(datafeed): add DataFrame cache'"
       ],
       "priority": 22,
       "passes": true,
-      "dependsOn": [
-        "MAESTRO-P5-MULTIOBJ"
-      ],
+      "dependsOn": ["MAESTRO-P5-MULTIOBJ"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Performance"
-      ],
+      "labels": ["Performance"],
       "context": {
-        "expectedSpeedup": "2-10x for data-heavy operations",
-        "affectedFiles": [
-          "backend/datafeed/dataframe_cache.py (new)",
-          "backend/engine_v2/walk_forward_optuna.py (integrate)"
-        ],
+        "affectedFiles": ["backend/datafeed/dataframe_cache.py (new)"],
         "verifyCommands": {
-          "test_cache": "pytest backend/tests/test_dataframe_cache.py -v",
-          "profile": "Profile walk-forward run, verify single data load"
-        },
-        "rollbackProcedure": {
-          "command": "Remove cache, load data in each split",
-          "notes": "Cache is optimization, removal just slows down"
-        },
-        "successCriteria": "Single DB query during walk-forward, memory tracking works"
+          "test_cache": "pytest backend/tests/test_dataframe_cache.py -v"
+        }
       },
       "completionNotes": "Completed by agent"
+    },
+    {
+      "id": "MAESTRO-FE-P0-WEBSOCKET",
+      "title": "Frontend Phase 0.1: Wire Up WebSocket Progress Hook",
+      "description": "[Frontend][Foundation] The useOptimizationProgress.ts hook exists but is NOT used. Wire it up to OptimizationForm.js replacing HTTP polling with WebSocket + polling fallback.",
+      "acceptanceCriteria": [
+        "PHASE 0 - READ: Read src/components/OptimizationForm.js and src/hooks/useOptimizationProgress.ts",
+        "PHASE 0 - ENV: Add REACT_APP_WS_HOST=localhost:8000 and REACT_APP_REST_API_V2_URL to .env",
+        "PHASE 0 - IMPORT: Import useOptimizationProgress hook into OptimizationForm.js",
+        "PHASE 0 - REMOVE_POLLING: Remove existing setInterval polling code (lines ~95-135)",
+        "PHASE 0 - INTEGRATE: Use hook: const { progress, isConnected, isComplete, error, status } = useOptimizationProgress(runningTid, isRunning)",
+        "PHASE 0 - EFFECT: Add useEffect to handle isComplete state and show success notification",
+        "PHASE 0 - PROGRESS_STATE: Update progress bar to use hook's progress.percent",
+        "TEST - BUILD: npm run build succeeds without errors",
+        "TEST - WS_CONNECT: Start optimization, verify WebSocket connects (check Network tab)",
+        "TEST - FALLBACK: Block WebSocket, verify polling fallback activates",
+        "VALIDATE - PROGRESS: Progress bar updates in real-time during optimization",
+        "VALIDATE - COMPLETE: Completion triggers success notification",
+        "COMMIT - MSG: git commit -m 'feat(frontend): wire up WebSocket progress hook'"
+      ],
+      "priority": 23,
+      "passes": false,
+      "dependsOn": ["MAESTRO-P3-WS-PROGRESS"],
+      "trelloCardId": null,
+      "trelloList": "to-dos",
+      "labels": ["Frontend", "Foundation"],
+      "context": {
+        "rationale": "Critical discovery: useOptimizationProgress.ts exists but is NOT USED - this is free value",
+        "affectedFiles": [
+          "frontend/maestro-ui/src/components/OptimizationForm.js",
+          "frontend/maestro-ui/.env (new or update)"
+        ],
+        "verifyCommands": {
+          "build": "cd frontend/maestro-ui && npm run build",
+          "start": "cd frontend/maestro-ui && npm start",
+          "test_ws": "Open DevTools Network tab, filter by WS, start optimization"
+        },
+        "breakingRisks": {
+          "ws_url_mismatch": "WebSocket URL format may differ from backend - check REACT_APP_WS_HOST",
+          "cors_issues": "WebSocket upgrade may fail CORS - backend must allow Origin header",
+          "missing_env": "REACT_APP_WS_HOST not set causes connection failure"
+        },
+        "rollbackProcedure": {
+          "command": "git checkout frontend/maestro-ui/src/components/OptimizationForm.js",
+          "notes": "Polling fallback in hook ensures functionality even if WebSocket fails"
+        }
+      }
+    },
+    {
+      "id": "MAESTRO-FE-P0-TRADINGVIEW",
+      "title": "Frontend Phase 0.2: Migrate Highcharts to TradingView",
+      "description": "[Frontend][Major] TradingChart.tsx exists but is NOT used. Add feature flag and gradually migrate CandleStickChart.js and StrategyChart.js to use TradingView Lightweight Charts.",
+      "acceptanceCriteria": [
+        "PHASE 0 - READ: Read src/components/TradingChart.tsx, CandleStickChart.js, StrategyChart.js",
+        "PHASE 0 - FEATURE_FLAG: Add REACT_APP_USE_TRADINGVIEW=true to .env.local",
+        "PHASE 0 - CONFIG: Create src/config/featureFlags.js with FEATURES.USE_TRADINGVIEW",
+        "PHASE 1 - CANDLESTICK: In CandleStickChart.js, add conditional: if (FEATURES.USE_TRADINGVIEW) return <TradingChart />",
+        "PHASE 1 - DATA_CONVERT: Use convertOHLCVData() from TradingChart.tsx to transform API data",
+        "PHASE 1 - MARKERS: Use convertTradeMarkers() for buy/sell marker conversion",
+        "PHASE 2 - STRATEGY: Repeat for StrategyChart.js",
+        "TEST - FLAG_OFF: With USE_TRADINGVIEW=false, verify Highcharts still renders",
+        "TEST - FLAG_ON: With USE_TRADINGVIEW=true, verify TradingView renders",
+        "TEST - DATA_FORMAT: Verify candles display correctly with both implementations",
+        "VALIDATE - MARKERS: Buy/sell markers appear at correct positions on both",
+        "VALIDATE - ZOOM: Zoom and pan work correctly on TradingView",
+        "COMMIT - MSG: git commit -m 'feat(frontend): add TradingView migration with feature flag'"
+      ],
+      "priority": 24,
+      "passes": false,
+      "dependsOn": ["MAESTRO-FE-P0-WEBSOCKET"],
+      "trelloCardId": null,
+      "trelloList": "to-dos",
+      "labels": ["Frontend", "Major"],
+      "context": {
+        "rationale": "TradingChart.tsx already exists but is not used - gradual migration via feature flag",
+        "affectedFiles": [
+          "frontend/maestro-ui/src/components/CandleStickChart.js",
+          "frontend/maestro-ui/src/components/StrategyChart.js",
+          "frontend/maestro-ui/src/config/featureFlags.js (new)",
+          "frontend/maestro-ui/.env.local"
+        ],
+        "verifyCommands": {
+          "test_highcharts": "REACT_APP_USE_TRADINGVIEW=false npm start",
+          "test_tradingview": "REACT_APP_USE_TRADINGVIEW=true npm start"
+        },
+        "breakingRisks": {
+          "data_format": "Highcharts uses arrays, TradingView uses objects - use converters",
+          "indicator_support": "Some indicators may not be supported - document gaps",
+          "timezone_handling": "Time zone handling may differ - test across date ranges"
+        },
+        "rollbackProcedure": {
+          "command": "Set REACT_APP_USE_TRADINGVIEW=false in .env.local",
+          "notes": "Feature flag allows instant rollback without code changes"
+        }
+      }
+    },
+    {
+      "id": "MAESTRO-FE-P0-UX",
+      "title": "Frontend Phase 0.3: Add ErrorBoundary and EmptyState Components",
+      "description": "[Frontend][UX] Add error handling and empty state components for better user experience.",
+      "acceptanceCriteria": [
+        "PHASE 0 - CREATE: Create src/components/ErrorBoundary.js with React error boundary",
+        "PHASE 0 - ALERT: Show MUI Alert with error message and Reload button",
+        "PHASE 0 - WRAP: Wrap Dashboard routes with ErrorBoundary",
+        "PHASE 1 - CREATE: Create src/components/EmptyState.js with configurable icon, title, description, action",
+        "PHASE 1 - ICON: Use MUI icons (ScienceIcon default)",
+        "PHASE 1 - ACTION: Optional action button with onAction callback",
+        "PHASE 2 - INTEGRATE: Add EmptyState to OptimizationResults when no tests exist",
+        "PHASE 2 - INTEGRATE: Add EmptyState to Evaluation when no data loaded",
+        "TEST - ERROR: Trigger error in child component, verify ErrorBoundary catches and displays",
+        "TEST - RELOAD: Click Reload button, verify page reloads",
+        "TEST - EMPTY: View Results with no tests, verify EmptyState shows with 'Run Test' action",
+        "VALIDATE - STYLING: Components match Virtuoso dark theme",
+        "COMMIT - MSG: git commit -m 'feat(frontend): add ErrorBoundary and EmptyState components'"
+      ],
+      "priority": 25,
+      "passes": false,
+      "dependsOn": ["MAESTRO-FE-P0-TRADINGVIEW"],
+      "trelloCardId": null,
+      "trelloList": "to-dos",
+      "labels": ["Frontend", "UX"],
+      "context": {
+        "affectedFiles": [
+          "frontend/maestro-ui/src/components/ErrorBoundary.js (new)",
+          "frontend/maestro-ui/src/components/EmptyState.js (new)",
+          "frontend/maestro-ui/src/components/Dashboard.js",
+          "frontend/maestro-ui/src/components/OptimizationResults.js",
+          "frontend/maestro-ui/src/components/Evaluation.js"
+        ],
+        "verifyCommands": {
+          "test_error": "Introduce intentional error, verify boundary catches",
+          "test_empty": "Clear results table, verify empty state shows"
+        }
+      }
+    },
+    {
+      "id": "MAESTRO-FE-P0-TOAST",
+      "title": "Frontend Phase 0.4: Add Toast Notification System",
+      "description": "[Frontend][UX] Add centralized toast notifications using MUI Snackbar via React Context.",
+      "acceptanceCriteria": [
+        "PHASE 0 - CREATE: Create src/context/NotificationContext.js with NotificationProvider",
+        "PHASE 0 - HOOK: Export useNotification() hook returning { notify } function",
+        "PHASE 0 - SNACKBAR: Use MUI Snackbar + Alert with severity (success/error/warning/info)",
+        "PHASE 0 - POSITION: Position at bottom-right with 6s auto-hide",
+        "PHASE 1 - WRAP: Wrap App with NotificationProvider in index.js",
+        "PHASE 1 - INTEGRATE: Add notify('Optimization completed!', 'success') to OptimizationForm on complete",
+        "PHASE 1 - INTEGRATE: Add notify('Failed to load data', 'error') on API errors",
+        "TEST - SUCCESS: Complete optimization, verify success toast appears",
+        "TEST - ERROR: Trigger API error, verify error toast appears",
+        "TEST - AUTO_HIDE: Verify toast auto-hides after 6 seconds",
+        "VALIDATE - STYLING: Toast matches Virtuoso dark theme (amber/cyan colors)",
+        "COMMIT - MSG: git commit -m 'feat(frontend): add toast notification system'"
+      ],
+      "priority": 26,
+      "passes": false,
+      "dependsOn": ["MAESTRO-FE-P0-UX"],
+      "trelloCardId": null,
+      "trelloList": "to-dos",
+      "labels": ["Frontend", "UX"],
+      "context": {
+        "affectedFiles": [
+          "frontend/maestro-ui/src/context/NotificationContext.js (new)",
+          "frontend/maestro-ui/src/index.js",
+          "frontend/maestro-ui/src/components/OptimizationForm.js"
+        ],
+        "verifyCommands": {
+          "start": "npm start",
+          "test_toast": "Run optimization, verify toast on completion"
+        }
+      }
+    },
+    {
+      "id": "MAESTRO-FE-P1-PROGRESS",
+      "title": "Frontend Phase 1: Enhanced Optimization Progress Component",
+      "description": "[Frontend][Feature] Create rich OptimizationProgress component with fold visualization, status chips, and expandable details.",
+      "acceptanceCriteria": [
+        "PHASE 0 - CREATE: Create src/components/OptimizationProgress.js",
+        "PHASE 0 - HOOK: Use useOptimizationProgress hook for data",
+        "PHASE 0 - STATUS: Display status chip (pending/running/completed/failed) with color coding",
+        "PHASE 0 - CONNECTION: Show Live/Polling chip based on isConnected state",
+        "PHASE 1 - PROGRESS_BAR: Styled LinearProgress with percentage text",
+        "PHASE 1 - FOLD_VIZ: Expandable section showing fold progress as colored boxes",
+        "PHASE 1 - FOLD_COLORS: Completed=success.main, Current=primary.main, Pending=grey.800",
+        "PHASE 1 - CONTROLS: Stop button that calls /optimization/{tid}/cancel",
+        "PHASE 2 - INTEGRATE: Replace LinearProgressWithLabel in OptimizationForm with OptimizationProgress",
+        "TEST - STATUS: Start optimization, verify status transitions pending→running→completed",
+        "TEST - FOLD: Verify fold boxes update as each fold completes",
+        "TEST - EXPAND: Verify expand/collapse toggle works",
+        "VALIDATE - STYLING: Component matches Virtuoso dark theme with glow effects",
+        "COMMIT - MSG: git commit -m 'feat(frontend): add enhanced OptimizationProgress component'"
+      ],
+      "priority": 27,
+      "passes": false,
+      "dependsOn": ["MAESTRO-FE-P0-TOAST"],
+      "trelloCardId": null,
+      "trelloList": "to-dos",
+      "labels": ["Frontend", "Feature"],
+      "context": {
+        "affectedFiles": [
+          "frontend/maestro-ui/src/components/OptimizationProgress.js (new)",
+          "frontend/maestro-ui/src/components/OptimizationForm.js"
+        ],
+        "verifyCommands": {
+          "start": "npm start",
+          "test_progress": "Start walk-forward optimization, watch progress component"
+        },
+        "breakingRisks": {
+          "cancel_endpoint": "Cancel endpoint may not exist in Flask - disable button or implement",
+          "fold_count": "Hook may not provide fold count - use default of 10"
+        }
+      }
+    },
+    {
+      "id": "MAESTRO-FE-P2-COMPARE",
+      "title": "Frontend Phase 2: Strategy Comparison Dashboard",
+      "description": "[Frontend][Feature] Create StrategyComparison component for side-by-side analysis of multiple strategies with metric comparison table.",
+      "acceptanceCriteria": [
+        "PHASE 0 - ROUTE: Add /compare route to Dashboard.js",
+        "PHASE 0 - NAV: Add Compare link to ListItems.js with CompareArrowsIcon",
+        "PHASE 0 - CREATE: Create src/components/StrategyComparison.js",
+        "PHASE 1 - SELECTOR: Autocomplete to add strategies from available tests",
+        "PHASE 1 - CHIPS: Display selected strategies as colored chips with delete",
+        "PHASE 1 - URL_SYNC: Sync selected tids to URL params (?tids=abc,def)",
+        "PHASE 2 - TABLE: Comparison table with metrics as rows, strategies as columns",
+        "PHASE 2 - METRICS: Sharpe, Annual Return, Max Drawdown, Win Rate, Profit Factor, Calmar, Sortino",
+        "PHASE 2 - HIGHLIGHT: Highlight best value per row with primary color and star",
+        "PHASE 2 - ARROWS: Show TrendingUp/TrendingDown icons for higher/lower better metrics",
+        "PHASE 3 - EXTRACT: Extract metrics from PyFolio analyzers in result data",
+        "TEST - ADD: Add 3 strategies, verify all appear in table",
+        "TEST - REMOVE: Remove strategy, verify table updates",
+        "TEST - URL: Refresh page, verify strategies reload from URL params",
+        "VALIDATE - BEST: Best values highlighted correctly for each metric type",
+        "COMMIT - MSG: git commit -m 'feat(frontend): add strategy comparison dashboard'"
+      ],
+      "priority": 28,
+      "passes": false,
+      "dependsOn": ["MAESTRO-FE-P1-PROGRESS"],
+      "trelloCardId": null,
+      "trelloList": "to-dos",
+      "labels": ["Frontend", "Feature"],
+      "context": {
+        "affectedFiles": [
+          "frontend/maestro-ui/src/components/StrategyComparison.js (new)",
+          "frontend/maestro-ui/src/components/Dashboard.js",
+          "frontend/maestro-ui/src/components/ListItems.js"
+        ],
+        "verifyCommands": {
+          "test_compare": "Navigate to /compare, add strategies, verify table"
+        },
+        "breakingRisks": {
+          "metric_keys": "PyFolio metric keys may differ - add mapping layer",
+          "performance": "Loading many strategies may be slow - limit to 5 max"
+        }
+      }
+    },
+    {
+      "id": "MAESTRO-FE-P3-WALKFORWARD",
+      "title": "Frontend Phase 3: Walk-Forward Visualization Components",
+      "description": "[Frontend][Feature] Create WalkForwardTimeline and ParameterStabilityChart components for visualizing WFO splits and parameter drift.",
+      "acceptanceCriteria": [
+        "PHASE 0 - CREATE: Create src/components/WalkForwardTimeline.js",
+        "PHASE 0 - TIMELINE: Horizontal bar showing train (primary.dark) and test (success.main) periods",
+        "PHASE 0 - TOOLTIP: Show split dates on hover",
+        "PHASE 0 - DATES: Display start and end dates below timeline",
+        "PHASE 1 - CREATE: Create src/components/ParameterStabilityChart.js",
+        "PHASE 1 - CHART: Use Recharts LineChart showing parameter values across folds",
+        "PHASE 1 - COLORS: Use theme colors (amber, cyan, green, red, purple) for different params",
+        "PHASE 1 - LEGEND: Show parameter names in legend",
+        "PHASE 2 - INTEGRATE: Add WalkForwardTimeline to Evaluation.js for WFO results",
+        "PHASE 2 - INTEGRATE: Add ParameterStabilityChart to Evaluation.js",
+        "TEST - TIMELINE: View WFO result, verify timeline shows correct train/test splits",
+        "TEST - STABILITY: Verify parameter lines show values for each fold",
+        "VALIDATE - RESPONSIVE: Components resize correctly with window",
+        "COMMIT - MSG: git commit -m 'feat(frontend): add walk-forward visualization components'"
+      ],
+      "priority": 29,
+      "passes": false,
+      "dependsOn": ["MAESTRO-FE-P2-COMPARE"],
+      "trelloCardId": null,
+      "trelloList": "to-dos",
+      "labels": ["Frontend", "Feature"],
+      "context": {
+        "affectedFiles": [
+          "frontend/maestro-ui/src/components/WalkForwardTimeline.js (new)",
+          "frontend/maestro-ui/src/components/ParameterStabilityChart.js (new)",
+          "frontend/maestro-ui/src/components/Evaluation.js"
+        ],
+        "dependencies": ["recharts"],
+        "verifyCommands": {
+          "install": "npm install recharts",
+          "test_timeline": "View WFO result, check timeline visualization",
+          "test_stability": "View WFO result, check parameter stability chart"
+        },
+        "breakingRisks": {
+          "split_format": "Split timestamps may be in different format - normalize",
+          "num_split": "Missing num_split field in old data - use array index fallback"
+        }
+      }
+    },
+    {
+      "id": "MAESTRO-FE-P4-OPTUNA",
+      "title": "Frontend Phase 4: Optuna Integration Components",
+      "description": "[Frontend][Feature] Create OptunaDashboard embed and native OptunaVisualization components for hyperparameter optimization visualization.",
+      "acceptanceCriteria": [
+        "PHASE 0 - CREATE: Create src/components/OptunaDashboard.js",
+        "PHASE 0 - IFRAME: Embed Optuna dashboard via iframe at REACT_APP_OPTUNA_DASHBOARD_URL",
+        "PHASE 0 - FALLBACK: Show info Alert if URL not configured",
+        "PHASE 1 - CREATE: Create src/components/OptunaVisualization.js",
+        "PHASE 1 - STUDY_INFO: Show study name, total trials, best value in Paper card",
+        "PHASE 1 - SCATTER: ScatterChart showing optimization history (trial vs objective)",
+        "PHASE 1 - BEST_HIGHLIGHT: Highlight best trial in green",
+        "PHASE 1 - PARAMS_TABLE: Table showing best parameters",
+        "PHASE 2 - ENV: Add REACT_APP_OPTUNA_DASHBOARD_URL to .env.example",
+        "PHASE 2 - INTEGRATE: Add OptunaVisualization to Evaluation.js for V2 results",
+        "TEST - IFRAME: With dashboard configured, verify iframe loads",
+        "TEST - NATIVE: Without dashboard, verify native visualization renders",
+        "VALIDATE - DATA: Verify trials data loads from /api/v2/optuna/studies/{id}/trials",
+        "COMMIT - MSG: git commit -m 'feat(frontend): add Optuna integration components'"
+      ],
+      "priority": 30,
+      "passes": false,
+      "dependsOn": ["MAESTRO-FE-P3-WALKFORWARD"],
+      "trelloCardId": null,
+      "trelloList": "to-dos",
+      "labels": ["Frontend", "Feature"],
+      "context": {
+        "affectedFiles": [
+          "frontend/maestro-ui/src/components/OptunaDashboard.js (new)",
+          "frontend/maestro-ui/src/components/OptunaVisualization.js (new)",
+          "frontend/maestro-ui/src/components/Evaluation.js",
+          "frontend/maestro-ui/.env.example"
+        ],
+        "verifyCommands": {
+          "test_embed": "Set REACT_APP_OPTUNA_DASHBOARD_URL, verify iframe loads",
+          "test_native": "Unset URL, verify native visualization renders"
+        },
+        "breakingRisks": {
+          "cors_iframe": "Optuna dashboard may block iframe - use native as fallback",
+          "api_missing": "Optuna API endpoints may not exist yet - show loading state"
+        }
+      }
+    },
+    {
+      "id": "MAESTRO-FE-P5-ANALYTICS",
+      "title": "Frontend Phase 5: Analytics Enhancement Components",
+      "description": "[Frontend][Feature] Create QuantStatsReport and MonthlyReturnsHeatmap components for advanced analytics display.",
+      "acceptanceCriteria": [
+        "PHASE 0 - CREATE: Create src/components/QuantStatsReport.js",
+        "PHASE 0 - SECTIONS: Three Paper cards for Returns, Risk, and Ratios metrics",
+        "PHASE 0 - METRICS: Returns (Total, CAGR, Best/Worst Day), Risk (Volatility, Max DD, VaR, CVaR), Ratios (Sharpe, Sortino, Calmar, Omega)",
+        "PHASE 0 - FORMAT: Format percentages and decimals appropriately",
+        "PHASE 0 - LOADING: Skeleton loading state while fetching",
+        "PHASE 1 - CREATE: Create src/components/MonthlyReturnsHeatmap.js",
+        "PHASE 1 - GRID: Months as columns, years as rows",
+        "PHASE 1 - COLORS: Green gradient for positive, red gradient for negative returns",
+        "PHASE 1 - VALUES: Show percentage in each cell, tooltip for exact value",
+        "PHASE 2 - INTEGRATE: Add QuantStatsReport to Evaluation.js",
+        "PHASE 2 - INTEGRATE: Add MonthlyReturnsHeatmap to Evaluation.js",
+        "TEST - REPORT: View optimization result, verify QuantStats metrics display",
+        "TEST - HEATMAP: Verify monthly returns heatmap renders with correct colors",
+        "VALIDATE - FALLBACK: Show 'QuantStats not available' if API returns 404",
+        "COMMIT - MSG: git commit -m 'feat(frontend): add analytics components'"
+      ],
+      "priority": 31,
+      "passes": false,
+      "dependsOn": ["MAESTRO-FE-P4-OPTUNA"],
+      "trelloCardId": null,
+      "trelloList": "to-dos",
+      "labels": ["Frontend", "Feature"],
+      "context": {
+        "affectedFiles": [
+          "frontend/maestro-ui/src/components/QuantStatsReport.js (new)",
+          "frontend/maestro-ui/src/components/MonthlyReturnsHeatmap.js (new)",
+          "frontend/maestro-ui/src/components/Evaluation.js"
+        ],
+        "verifyCommands": {
+          "test_quantstats": "View result with QuantStats endpoint configured",
+          "test_heatmap": "Verify heatmap colors match returns (green=positive, red=negative)"
+        },
+        "breakingRisks": {
+          "endpoint_missing": "QuantStats endpoint may not exist in Flask - hide section",
+          "data_format": "Return data format may need transformation"
+        }
+      }
+    },
+    {
+      "id": "MAESTRO-FE-P6-DATA",
+      "title": "Frontend Phase 6: Data Management Page",
+      "description": "[Frontend][Feature] Create DataManagement page for viewing and downloading OHLCV data from providers.",
+      "acceptanceCriteria": [
+        "PHASE 0 - ROUTE: Add /data route to Dashboard.js",
+        "PHASE 0 - NAV: Add Data link to ListItems.js with StorageIcon",
+        "PHASE 0 - CREATE: Create src/components/DataManagement.js",
+        "PHASE 1 - TABLE: Table showing Provider, Symbol, Timeframe, Records, Last Update, Status columns",
+        "PHASE 1 - STATUS_CHIPS: CheckCircle (OK) or Warning (Gaps) status chips",
+        "PHASE 1 - REFRESH: Refresh button to reload data sources list",
+        "PHASE 1 - DOWNLOAD: Download IconButton per row to trigger data download",
+        "PHASE 2 - ADD_DIALOG: Dialog to add new symbol (Provider select, Symbol text, Timeframe select)",
+        "PHASE 2 - PROGRESS: Show LinearProgress in download button while downloading",
+        "TEST - LIST: Navigate to /data, verify data sources table loads",
+        "TEST - DOWNLOAD: Click download, verify progress shows and completes",
+        "TEST - ADD: Open add dialog, fill form, verify download triggers",
+        "VALIDATE - STATUS: Verify gaps detected and shown with warning chip",
+        "COMMIT - MSG: git commit -m 'feat(frontend): add data management page'"
+      ],
+      "priority": 32,
+      "passes": false,
+      "dependsOn": ["MAESTRO-FE-P5-ANALYTICS"],
+      "trelloCardId": null,
+      "trelloList": "to-dos",
+      "labels": ["Frontend", "Feature"],
+      "context": {
+        "affectedFiles": [
+          "frontend/maestro-ui/src/components/DataManagement.js (new)",
+          "frontend/maestro-ui/src/components/Dashboard.js",
+          "frontend/maestro-ui/src/components/ListItems.js"
+        ],
+        "verifyCommands": {
+          "test_data": "Navigate to /data, verify table loads",
+          "test_download": "Click download button, verify progress"
+        },
+        "breakingRisks": {
+          "status_endpoint": "/datasource/status endpoint may not exist - implement or use /datasource/available",
+          "download_endpoint": "/datasource/download endpoint may not exist - disable button until implemented"
+        }
+      }
     }
   ],
   "metadata": {
-    "updatedAt": "2026-02-05T07:50:27.176Z",
+    "updatedAt": "2026-02-05T12:00:00.000Z",
     "project": "Maestro",
-    "description": "Modernization plan from 2020 stack (Backtrader, RethinkDB, Flask, React 16) to 2026 stack (VectorBT, QuestDB, FastAPI, React 18, Optuna). 6 phases: P0 Infrastructure, P1 Core Engine, P2 Data Layer, P3 API+Frontend, P4 Analytics, P5 Optimization.",
+    "description": "Modernization plan from 2020 stack (Backtrader, RethinkDB, Flask, React 16) to 2026 stack (VectorBT, QuestDB, FastAPI, React 18, Optuna). 6 phases: P0 Infrastructure, P1 Core Engine, P2 Data Layer, P3 API+Frontend, P4 Analytics, P5 Optimization. Now includes Frontend modernization phases FE-P0 through FE-P6.",
     "consensusMatrix": "See docs/CONSENSUS_MATRIX.md for multi-agent review",
     "implementationPlan": "See docs/IMPLEMENTATION_PLAN_V2.md for detailed technical plan",
+    "frontendPlan": "See docs/FRONTEND_IMPLEMENTATION_PLAN.md for detailed frontend plan",
     "totalPhases": 6,
-    "totalStories": 22,
-    "estimatedDuration": "12-16 weeks"
+    "totalBackendStories": 22,
+    "totalFrontendStories": 10,
+    "totalStories": 32,
+    "estimatedDuration": "16-20 weeks (including frontend)"
   }
 }
