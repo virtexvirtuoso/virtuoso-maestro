@@ -1,4 +1,182 @@
-body{
-    margin:0;
-    padding:0;
+/* Virtuoso-inspired dark theme globals */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --neon-amber: #fbbf24;
+  --neon-cyan: #06B6D4;
+  --neon-red: #ff0066;
+  --dark-bg-primary: #000000;
+  --dark-bg-secondary: #111111;
+  --dark-border: #222222;
+  --dark-text-primary: #e0e0e0;
+  --dark-text-secondary: #9ca3af;
+  --success: #10b981;
+  --error: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  background-color: var(--dark-bg-primary);
+  color: var(--dark-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--dark-bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444444;
+}
+
+/* Code and monospace elements */
+code, pre, .mono {
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* Selection styling */
+::selection {
+  background: rgba(251, 191, 36, 0.3);
+  color: var(--dark-text-primary);
+}
+
+/* Link styling */
+a {
+  color: var(--neon-amber);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+a:hover {
+  color: #fcd34d;
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+}
+
+/* Focus outline for accessibility */
+:focus-visible {
+  outline: 2px solid var(--neon-amber);
+  outline-offset: 2px;
+}
+
+/* Glow effects utility classes */
+.glow-amber {
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+}
+
+.glow-amber-hover:hover {
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.3);
+}
+
+.glow-red {
+  box-shadow: 0 0 20px rgba(255, 0, 102, 0.3);
+}
+
+/* Text glow utility */
+.text-glow-amber {
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  border-color: var(--neon-amber);
+  box-shadow: 0 0 20px rgba(251, 191, 36, 0.1);
+}
+
+/* Pulse animation for live indicators */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px var(--neon-amber);
+  }
+  50% {
+    box-shadow: 0 0 20px var(--neon-amber), 0 0 30px var(--neon-amber);
+  }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
+
+/* Gradient backgrounds */
+.gradient-amber {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1) 0%, transparent 100%);
+}
+
+.gradient-border {
+  position: relative;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(135deg, var(--neon-amber), var(--neon-cyan));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* Status indicators */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-dot.success {
+  background-color: var(--success);
+  box-shadow: 0 0 8px var(--success);
+}
+
+.status-dot.error {
+  background-color: var(--error);
+  box-shadow: 0 0 8px var(--error);
+}
+
+.status-dot.warning {
+  background-color: var(--neon-amber);
+  box-shadow: 0 0 8px var(--neon-amber);
+}
+
+/* Table styling override for Highcharts and other libraries */
+table {
+  border-collapse: collapse;
+}
+
+/* Chart container styling */
+.chart-container {
+  background: var(--dark-bg-secondary);
+  border: 1px solid var(--dark-border);
+  border-radius: 12px;
+  padding: 16px;
 }

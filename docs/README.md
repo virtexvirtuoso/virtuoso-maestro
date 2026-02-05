@@ -44,10 +44,14 @@ docs/
 ├── reports/                  # Generated reports & validation
 │   └── PRD_VALIDATION_REPORT.md
 │
-└── legacy/                   # Filos (2020) archive
+└── legacy/                   # Filos (2020) archive [GITIGNORED - local only]
     ├── README.md             # Archive index
     ├── original-codebase/    # Complete Oct 2020 codebase
-    └── filos-revival.md      # Revival task plan
+    ├── videos/               # 13 demo videos (~3.7 GB)
+    ├── sketches/             # Workflow diagrams
+    ├── outlines/             # Project specs
+    ├── strategies/           # 22 Freqtrade strategies
+    └── branding/             # Logo & assets
 ```
 
 ---

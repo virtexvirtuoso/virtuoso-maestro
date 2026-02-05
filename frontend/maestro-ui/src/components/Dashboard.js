@@ -1,6 +1,5 @@
 import React from 'react';
 import { styled } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
 import Drawer from '@mui/material/Drawer';
 import Box from '@mui/material/Box';
 import AppBar from '@mui/material/AppBar';
@@ -22,13 +21,13 @@ import Evaluation from './Evaluation';
 
 function Copyright() {
   return (
-    <Typography variant="body2" color="text.secondary" align="center">
-      {'Copyright © '}
-      <Link color="inherit" href="https://mui.com/">
+    <Typography variant="body2" color="text.secondary" align="center" sx={{ fontFamily: '"IBM Plex Mono", monospace' }}>
+      {'© '}
+      <Link color="primary" href="/">
         Maestro
       </Link>{' '}
       {new Date().getFullYear()}
-      {'.'}
+      {' · Walk-Forward Optimization Engine'}
     </Typography>
   );
 }
@@ -93,7 +92,6 @@ export default function Dashboard() {
 
   return (
     <Box sx={{ display: 'flex' }}>
-      <CssBaseline />
       <AppBarStyled position="absolute" open={open}>
         <Toolbar
           sx={{
@@ -115,11 +113,17 @@ export default function Dashboard() {
           <Typography
             component="h1"
             variant="h6"
-            color="inherit"
             noWrap
-            sx={{ flexGrow: 1 }}
+            sx={{
+              flexGrow: 1,
+              fontFamily: '"IBM Plex Mono", monospace',
+              fontWeight: 700,
+              color: 'primary.main',
+              textShadow: '0 0 10px rgba(251, 191, 36, 0.5)',
+              letterSpacing: '0.05em',
+            }}
           >
-            Maestro
+            MAESTRO
           </Typography>
           <IconButton color="inherit">
             <Badge badgeContent={1} color="secondary">
@@ -147,10 +151,7 @@ export default function Dashboard() {
       <Box
         component="main"
         sx={{
-          backgroundColor: (theme) =>
-            theme.palette.mode === 'light'
-              ? theme.palette.grey[100]
-              : theme.palette.grey[900],
+          backgroundColor: 'background.default',
           flexGrow: 1,
           height: '100vh',
           overflow: 'auto',

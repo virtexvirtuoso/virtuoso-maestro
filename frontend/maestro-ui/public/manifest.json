@@ -1,6 +1,6 @@
 {
-  "short_name": "Filos App",
-  "name": "Filos Application",
+  "short_name": "Maestro",
+  "name": "Maestro - Walk-Forward Optimization",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +20,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#fbbf24",
+  "background_color": "#000000"
 }
