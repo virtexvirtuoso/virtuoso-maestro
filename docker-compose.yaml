@@ -1,47 +1,47 @@
 version: "3.3"
 services:
-  filos-be:
+  maestro-be:
     build:
       dockerfile: backend.Dockerfile
       context: .
     ports:
       - 5050:5000
     environment:
-      - CONFIG_FILE=filos-prd.yaml
+      - CONFIG_FILE=maestro-prd.yaml
     depends_on:
       - rethinkdb
     entrypoint: bash
     command: ./wait-for-it.sh rethinkdb:28015 -- python3 main/rest_api.py
-  filos-bitmex:
+  maestro-bitmex:
     build:
       dockerfile: backend.Dockerfile
       context: .
     environment:
-      - CONFIG_FILE=filos-prd.yaml
+      - CONFIG_FILE=maestro-prd.yaml
     depends_on:
       - rethinkdb
     entrypoint: bash
     command: ./wait-for-it.sh rethinkdb:28015 -- python3 main/data_bitmex_download.py
-  filos-binance:
+  maestro-binance:
     build:
       dockerfile: backend.Dockerfile
       context: .
     environment:
-      - CONFIG_FILE=filos-prd.yaml
+      - CONFIG_FILE=maestro-prd.yaml
     depends_on:
       - rethinkdb
     entrypoint: bash
     command: ./wait-for-it.sh rethinkdb:28015 -- python3 main/data_binance_download.py
-  filos-fe:
+  maestro-fe:
     build:
       dockerfile: frontend.Dockerfile
       context: .
     ports:
       - 8080:5000
     depends_on:
-      - filos-be
+      - maestro-be
     entrypoint: bash
-    command: ./wait-for-it.sh filos-be:5050 -- serve -s build
+    command: ./wait-for-it.sh maestro-be:5050 -- serve -s build
   rethinkdb:
     image: rethinkdb
     ports:

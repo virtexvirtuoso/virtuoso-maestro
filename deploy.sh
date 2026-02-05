@@ -12,13 +12,13 @@ pretty_title "Deployer"
 echo $(whoami)
 echo $HOSTNAME
 /snap/bin/docker ps
-rm -rf filos
+rm -rf maestro
 pretty_title "Cloning the repo"
-git clone git@bitbucket.org:filos-crypto/filos.git
-cd filos/ || exit
+git clone git@bitbucket.org:virtuoso-crypto/maestro.git
+cd maestro/ || exit
 export IP=$(hostname -I | cut -d ' ' -f 1)
-echo "REACT_APP_REST_API_URL=http://${IP}:5050" > frontend/filosui/.env
-ls -lah frontend/filosui
+echo "REACT_APP_REST_API_URL=http://${IP}:5050" > frontend/maestro-ui/.env
+ls -lah frontend/maestro-ui
 /snap/bin/docker system prune -f
 /snap/bin/docker images
 pretty_title "Building new docker images"

@@ -1,10 +1,12 @@
-# Filos
+# Maestro
+
+*The Master Conductor of Trading Strategies*
 
 A quantitative trading platform for algorithmic strategy development, backtesting, and optimization.
 
 ## Overview
 
-Filos is a comprehensive trading system that enables users to develop, test, and optimize trading strategies using historical market data. The platform provides a web-based interface for strategy evaluation and supports multiple data sources including Binance and BitMEX.
+Maestro is a comprehensive trading system that enables users to develop, test, and optimize trading strategies using historical market data. The platform provides a web-based interface for strategy evaluation and supports multiple data sources including Binance and BitMEX.
 
 ## Architecture
 
@@ -52,7 +54,7 @@ Filos is a comprehensive trading system that enables users to develop, test, and
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd filos
+cd maestro
 ```
 
 2. Start the services:
@@ -67,10 +69,10 @@ docker-compose up -d
 
 ## Services
 
-- **filos-be**: Main backend API service
-- **filos-fe**: React frontend application
-- **filos-binance**: Binance data downloader
-- **filos-bitmex**: BitMEX data downloader
+- **maestro-be**: Main backend API service
+- **maestro-fe**: React frontend application
+- **maestro-binance**: Binance data downloader
+- **maestro-bitmex**: BitMEX data downloader
 - **rethinkdb**: Database service
 
 ## Development
@@ -94,8 +96,8 @@ The frontend uses:
 ### Configuration
 
 Configuration files:
-- `backend/filos-dev.yaml`: Development configuration
-- `backend/filos-prd.yaml`: Production configuration
+- `backend/maestro-dev.yaml`: Development configuration
+- `backend/maestro-prd.yaml`: Production configuration
 
 ## API Endpoints
 

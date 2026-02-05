@@ -12,7 +12,7 @@ ROOT_DIR = Path(__file__).parents[1].absolute()
 
 if __name__ == '__main__':
 
-    CONFIG_FILE = os.environ.get('CONFIG_FILE', 'filos-dev.yaml')
+    CONFIG_FILE = os.environ.get('CONFIG_FILE', 'maestro-dev.yaml')
 
     path = ROOT_DIR.joinpath(CONFIG_FILE)
     config_reader = ConfigReader().read(path=path)
