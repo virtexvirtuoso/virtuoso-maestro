@@ -1,6 +1,7 @@
 bitmex==0.2.2
 marshmallow==3.6.1
 rethinkdb==2.4.7
+psycopg[binary,pool]==3.3.2
 backtrader==1.9.76.123
 pandas==1.0.5
 matplotlib==3.3.0

@@ -67,5 +67,24 @@ services:
       retries: 3
       start_period: 10s
 
+  questdb:
+    image: questdb/questdb:latest
+    ports:
+      - 9010:9000   # Web console (mapped to 9010 to avoid conflicts)
+      - 8812:8812   # PostgreSQL wire protocol
+      - 9009:9009   # InfluxDB Line Protocol (ILP)
+    volumes:
+      - questdb-data:/var/lib/questdb
+    environment:
+      - QDB_PG_USER=admin
+      - QDB_PG_PASSWORD=quest
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/exec?query=SELECT%201"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 volumes:
   db-data:
+  questdb-data:
