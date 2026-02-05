@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, 'phase*/**']
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      rethinkdb:
+        image: rethinkdb:2.4
+        ports:
+          - 28015:28015
+          - 8080:8080
+        options: >-
+          --health-cmd "rethinkdb --version"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            backend/requirements-v2.txt
+            requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          pip install -r backend/requirements-v2.txt
+
+      - name: Wait for RethinkDB
+        run: |
+          for i in {1..30}; do
+            if nc -z localhost 28015; then
+              echo "RethinkDB is ready"
+              break
+            fi
+            echo "Waiting for RethinkDB..."
+            sleep 1
+          done
+
+      - name: Run tests with coverage
+        run: |
+          cd backend
+          pytest tests/ --cov=. --cov-report=xml --cov-report=term-missing -v
+        env:
+          RETHINKDB_HOST: localhost
+          RETHINKDB_PORT: 28015
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: backend/coverage.xml
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install linting tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Run ruff linting
+        run: ruff check backend/ --output-format=github
+        continue-on-error: true  # Allow failures initially during modernization
+
+  typecheck:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install type checking tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install mypy
+          pip install -r backend/requirements-v2.txt
+          pip install types-PyYAML types-requests
+
+      - name: Run mypy type checking
+        run: mypy backend/ --ignore-missing-imports --no-error-summary
+        continue-on-error: true  # Allow failures initially during modernization
