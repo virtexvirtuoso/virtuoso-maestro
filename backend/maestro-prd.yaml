@@ -96,3 +96,12 @@ config:
     parallel:
       enabled: true
       max_workers: null  # null = auto (cpu_count - 1)
+    multi_objective:
+      enabled: false  # Enable Pareto-based multi-objective selection
+      method: pareto  # pareto | weighted | rank_average
+      weights:  # Custom weights for metrics (default: balanced)
+        sharpe_ratio: 0.30
+        vwr: 0.25
+        sortino_ratio: 0.20
+        calmar_ratio: 0.15
+        turnover_penalty: 0.10

@@ -28,6 +28,11 @@ import pandas as pd
 from optuna.pruners import HyperbandPruner, MedianPruner
 from optuna.samplers import TPESampler
 
+from .multi_objective_selector import (
+    MultiObjectiveConfig,
+    MultiObjectiveSelector,
+    calculate_extended_metrics,
+)
 from .optuna_dashboard_storage import (
     OptunaDashboardStorage,
     create_study_with_dashboard,
@@ -66,6 +71,11 @@ class WalkForwardConfig:
     use_vwr_ranking: bool = True  # Use combined Sharpe + VWR ranking (matches V1)
     pruning_enabled: bool = True
     n_startup_trials: int = 10  # Trials before pruning kicks in
+
+    # Multi-objective selection (Phase 5.4)
+    use_multi_objective: bool = False  # Use Pareto-based selection instead of single metric
+    multi_objective_method: str = 'pareto'  # 'pareto', 'weighted', 'rank_average'
+    multi_objective_weights: dict = None  # Custom weights for metrics (default: balanced)
 
     # Early stopping
     early_stopping_rounds: int = 20  # Stop if no improvement
@@ -319,6 +329,9 @@ class WalkForwardOptuna(Thread):
         """
         param_space = self.strategy.get_param_space()
 
+        # Store trial results for multi-objective selection
+        trial_results = []
+
         def objective(trial: optuna.Trial) -> float:
             # Sample parameters from search space
             params = {}
@@ -356,6 +369,20 @@ class WalkForwardOptuna(Thread):
                 # Check if trial should be pruned based on Sharpe
                 if trial.should_prune():
                     raise optuna.TrialPruned()
+
+                # Store trial result for multi-objective selection (Phase 5.4)
+                if self.config.use_multi_objective:
+                    trial_results.append({
+                        'params': params.copy(),
+                        'sharpe_ratio': sharpe,
+                        'vwr': result.vwr if not pd.isna(result.vwr) else 0.0,
+                        'sortino_ratio': result.sortino_ratio if not pd.isna(result.sortino_ratio) else 0.0,
+                        'calmar_ratio': result.calmar_ratio if not pd.isna(result.calmar_ratio) else 0.0,
+                        'max_drawdown': result.max_drawdown if not pd.isna(result.max_drawdown) else 0.0,
+                        'total_return': total_return,
+                        'num_trades': result.num_trades,
+                        'returns': result.returns,
+                    })
 
                 # Return optimization metric
                 # When use_vwr_ranking is enabled, combine Sharpe and VWR for ranking
@@ -427,8 +454,26 @@ class WalkForwardOptuna(Thread):
             show_progress_bar=False,
         )
 
-        # Get best parameters
-        if study.best_trial:
+        # Get best parameters - use multi-objective selection if enabled (Phase 5.4)
+        if self.config.use_multi_objective and trial_results:
+            # Create multi-objective selector with configured method
+            mo_config = MultiObjectiveConfig(
+                method=self.config.multi_objective_method,
+            )
+            # Apply custom weights if provided
+            if self.config.multi_objective_weights:
+                mo_config.weights = self.config.multi_objective_weights
+
+            selector = MultiObjectiveSelector(config=mo_config)
+            optimal_params = selector.select(trial_results)
+
+            # Log Pareto selection info
+            pareto_front = selector.get_pareto_front(trial_results)
+            self.logger.info(
+                f"Fold {fold_idx} multi-objective: selected from {len(pareto_front)} Pareto-optimal "
+                f"solutions (method={self.config.multi_objective_method}), params={optimal_params}"
+            )
+        elif study.best_trial:
             optimal_params = study.best_trial.params
             self.logger.info(
                 f"Fold {fold_idx} optimization: best {self.config.optimization_metric}="

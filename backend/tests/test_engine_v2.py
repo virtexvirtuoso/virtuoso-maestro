@@ -2059,6 +2059,556 @@ class TestEnhancedBayesianOptimization:
 
 
 # =============================================================================
+# Multi-Objective Selector Tests (Phase 5.4)
+# =============================================================================
+
+class TestMultiObjectiveSelector:
+    """Tests for multi-objective parameter selection"""
+
+    def test_calculate_sortino_ratio(self):
+        """Test Sortino ratio calculation: (mean_return * 252) / downside_std"""
+        from engine_v2.multi_objective_selector import calculate_sortino_ratio
+
+        # Create returns with known properties
+        np.random.seed(42)
+        # Positive mean with some downside
+        returns = pd.Series([0.01, 0.02, -0.01, 0.015, -0.005, 0.01, 0.02, -0.015, 0.01, 0.005])
+
+        sortino = calculate_sortino_ratio(returns, annualization_factor=365)
+
+        # Manually calculate expected
+        mean_return = returns.mean()
+        downside_returns = returns[returns < 0]
+        downside_std = np.sqrt((downside_returns ** 2).mean())
+        expected = (mean_return * 365) / (downside_std * np.sqrt(365))
+
+        assert abs(sortino - expected) < 0.01
+        assert sortino > 0  # Positive returns should give positive Sortino
+
+    def test_calculate_sortino_ratio_no_downside(self):
+        """Test Sortino with no downside returns"""
+        from engine_v2.multi_objective_selector import calculate_sortino_ratio
+
+        returns = pd.Series([0.01, 0.02, 0.015, 0.01, 0.005])
+        sortino = calculate_sortino_ratio(returns)
+
+        # With no downside, Sortino should be infinite for positive returns
+        assert sortino == float('inf') or sortino > 100
+
+    def test_calculate_calmar_ratio(self):
+        """Test Calmar ratio calculation: annual_return / max_drawdown"""
+        from engine_v2.multi_objective_selector import calculate_calmar_ratio
+
+        # Create returns with known max drawdown
+        returns = pd.Series([0.10, -0.05, 0.08, -0.15, 0.12, 0.05])
+
+        calmar = calculate_calmar_ratio(returns, annualization_factor=365)
+
+        # Calculate expected components
+        equity = (1 + returns).cumprod()
+        running_max = equity.cummax()
+        drawdown = (equity - running_max) / running_max
+        max_dd = abs(drawdown.min())
+
+        total_return = equity.iloc[-1] - 1
+        annual_return = (1 + total_return) ** (365 / len(returns)) - 1
+        expected = annual_return / max_dd
+
+        assert abs(calmar - expected) < 0.1
+
+    def test_calculate_turnover_penalty(self):
+        """Test turnover penalty: -num_trades / len(returns)"""
+        from engine_v2.multi_objective_selector import calculate_turnover_penalty
+
+        returns = pd.Series([0.01] * 100)
+        num_trades = 20
+
+        penalty = calculate_turnover_penalty(num_trades, returns)
+
+        expected = -20 / 100  # -0.2
+        assert penalty == expected
+
+        # More trades = more negative penalty
+        penalty_high = calculate_turnover_penalty(50, returns)
+        assert penalty_high < penalty  # More negative
+
+    def test_calculate_extended_metrics(self):
+        """Test that extended metrics are calculated correctly"""
+        from engine_v2.multi_objective_selector import calculate_extended_metrics
+
+        np.random.seed(42)
+        returns = pd.Series(np.random.randn(100) * 0.02)
+        num_trades = 10
+
+        metrics = calculate_extended_metrics(
+            returns=returns,
+            num_trades=num_trades,
+            sharpe_ratio=1.5,
+            vwr=0.8,
+            max_drawdown=0.15,
+        )
+
+        assert 'sortino_ratio' in metrics
+        assert 'calmar_ratio' in metrics
+        assert 'turnover_penalty' in metrics
+        assert metrics['sharpe_ratio'] == 1.5
+        assert metrics['vwr'] == 0.8
+        assert metrics['max_drawdown'] == 0.15
+        assert metrics['turnover_penalty'] == -10 / 100
+
+    def test_dominates(self):
+        """Test domination check: j dominates i if j >= i in ALL metrics and j > i in at least one"""
+        from engine_v2.multi_objective_selector import dominates
+
+        metrics = ['sharpe_ratio', 'vwr', 'sortino_ratio']
+
+        # A dominates B (A >= B in all, A > B in some)
+        sol_a = {'sharpe_ratio': 2.0, 'vwr': 1.5, 'sortino_ratio': 3.0}
+        sol_b = {'sharpe_ratio': 1.5, 'vwr': 1.0, 'sortino_ratio': 2.5}
+
+        assert dominates(sol_a, sol_b, metrics) == True
+        assert dominates(sol_b, sol_a, metrics) == False
+
+        # Equal solutions - no domination
+        assert dominates(sol_a, sol_a, metrics) == False
+
+        # Neither dominates (trade-off)
+        sol_c = {'sharpe_ratio': 2.0, 'vwr': 0.5, 'sortino_ratio': 3.0}
+        sol_d = {'sharpe_ratio': 1.5, 'vwr': 1.5, 'sortino_ratio': 2.5}
+
+        assert dominates(sol_c, sol_d, metrics) == False
+        assert dominates(sol_d, sol_c, metrics) == False
+
+    def test_pareto_optimal_known_front(self):
+        """Test Pareto front identification with known optimal solutions"""
+        from engine_v2.multi_objective_selector import pareto_optimal
+
+        metrics = ['sharpe_ratio', 'vwr']
+
+        # Create solutions where some clearly dominate others
+        solutions = [
+            {'sharpe_ratio': 1.0, 'vwr': 1.0},  # 0 - dominated by 2
+            {'sharpe_ratio': 2.0, 'vwr': 0.5},  # 1 - Pareto optimal (trade-off)
+            {'sharpe_ratio': 1.5, 'vwr': 1.5},  # 2 - Pareto optimal (dominates 0)
+            {'sharpe_ratio': 0.5, 'vwr': 0.5},  # 3 - dominated by all
+            {'sharpe_ratio': 0.8, 'vwr': 1.8},  # 4 - Pareto optimal (trade-off)
+        ]
+
+        pareto_indices = pareto_optimal(solutions, metrics)
+
+        # Solutions 1, 2, 4 are Pareto-optimal
+        assert 1 in pareto_indices
+        assert 2 in pareto_indices
+        assert 4 in pareto_indices
+        assert 0 not in pareto_indices
+        assert 3 not in pareto_indices
+
+    def test_pareto_optimal_single_solution(self):
+        """Test Pareto front with single solution"""
+        from engine_v2.multi_objective_selector import pareto_optimal
+
+        solutions = [{'sharpe_ratio': 1.0, 'vwr': 1.0}]
+        pareto_indices = pareto_optimal(solutions, ['sharpe_ratio', 'vwr'])
+
+        assert pareto_indices == [0]
+
+    def test_pareto_optimal_all_equal(self):
+        """Test Pareto front when all solutions are equal"""
+        from engine_v2.multi_objective_selector import pareto_optimal
+
+        solutions = [
+            {'sharpe_ratio': 1.0, 'vwr': 1.0},
+            {'sharpe_ratio': 1.0, 'vwr': 1.0},
+            {'sharpe_ratio': 1.0, 'vwr': 1.0},
+        ]
+        pareto_indices = pareto_optimal(solutions, ['sharpe_ratio', 'vwr'])
+
+        # All solutions are Pareto-optimal when equal
+        assert len(pareto_indices) == 3
+
+    def test_weighted_score(self):
+        """Test weighted score calculation"""
+        from engine_v2.multi_objective_selector import weighted_score
+
+        solution = {'sharpe_ratio': 2.0, 'vwr': 1.0, 'sortino_ratio': 3.0}
+        weights = {'sharpe_ratio': 0.5, 'vwr': 0.3, 'sortino_ratio': 0.2}
+        metrics = ['sharpe_ratio', 'vwr', 'sortino_ratio']
+
+        score = weighted_score(solution, weights, metrics)
+
+        # Expected: (2.0*0.5 + 1.0*0.3 + 3.0*0.2) / 1.0 = 1.9
+        expected = (2.0 * 0.5 + 1.0 * 0.3 + 3.0 * 0.2)
+        assert abs(score - expected) < 0.001
+
+    def test_rank_average_score(self):
+        """Test rank average score calculation"""
+        from engine_v2.multi_objective_selector import rank_average_score
+
+        solutions = [
+            {'sharpe_ratio': 1.0, 'vwr': 3.0},  # 0: rank 3 in sharpe, rank 1 in vwr
+            {'sharpe_ratio': 2.0, 'vwr': 2.0},  # 1: rank 2 in sharpe, rank 2 in vwr
+            {'sharpe_ratio': 3.0, 'vwr': 1.0},  # 2: rank 1 in sharpe, rank 3 in vwr
+        ]
+        metrics = ['sharpe_ratio', 'vwr']
+
+        # Solution 1 has avg rank = 2.0 (best average)
+        score_0 = rank_average_score(0, solutions, metrics)  # avg rank = 2.0
+        score_1 = rank_average_score(1, solutions, metrics)  # avg rank = 2.0
+        score_2 = rank_average_score(2, solutions, metrics)  # avg rank = 2.0
+
+        # All have same average rank (perfect trade-off)
+        assert abs(score_0 - score_1) < 0.001
+        assert abs(score_1 - score_2) < 0.001
+
+    def test_selector_pareto_method(self):
+        """Test MultiObjectiveSelector with Pareto method"""
+        from engine_v2.multi_objective_selector import MultiObjectiveConfig, MultiObjectiveSelector
+
+        config = MultiObjectiveConfig(
+            method='pareto',
+            metrics=['sharpe_ratio', 'vwr'],
+            weights={'sharpe_ratio': 0.6, 'vwr': 0.4},
+        )
+        selector = MultiObjectiveSelector(config)
+
+        trials = [
+            {'params': {'period': 10}, 'sharpe_ratio': 1.0, 'vwr': 1.0, 'num_trades': 10},
+            {'params': {'period': 20}, 'sharpe_ratio': 2.0, 'vwr': 0.5, 'num_trades': 5},
+            {'params': {'period': 30}, 'sharpe_ratio': 1.5, 'vwr': 1.5, 'num_trades': 8},
+            {'params': {'period': 40}, 'sharpe_ratio': 0.5, 'vwr': 0.5, 'num_trades': 20},
+        ]
+
+        best_params = selector.select(trials)
+
+        # Should select from Pareto front (trial 1 or 2 or 3)
+        assert best_params['period'] in [20, 30]
+
+    def test_selector_weighted_method(self):
+        """Test MultiObjectiveSelector with weighted method"""
+        from engine_v2.multi_objective_selector import MultiObjectiveConfig, MultiObjectiveSelector
+
+        config = MultiObjectiveConfig(
+            method='weighted',
+            metrics=['sharpe_ratio', 'vwr'],
+            weights={'sharpe_ratio': 0.8, 'vwr': 0.2},
+        )
+        selector = MultiObjectiveSelector(config)
+
+        trials = [
+            {'params': {'period': 10}, 'sharpe_ratio': 1.0, 'vwr': 3.0, 'num_trades': 10},
+            {'params': {'period': 20}, 'sharpe_ratio': 3.0, 'vwr': 1.0, 'num_trades': 5},  # Higher Sharpe weighted
+        ]
+
+        best_params = selector.select(trials)
+
+        # With 0.8 weight on Sharpe, period=20 (Sharpe=3.0) should win
+        assert best_params['period'] == 20
+
+    def test_selector_rank_average_method(self):
+        """Test MultiObjectiveSelector with rank_average method"""
+        from engine_v2.multi_objective_selector import MultiObjectiveConfig, MultiObjectiveSelector
+
+        config = MultiObjectiveConfig(
+            method='rank_average',
+            metrics=['sharpe_ratio', 'vwr'],
+        )
+        selector = MultiObjectiveSelector(config)
+
+        trials = [
+            {'params': {'period': 10}, 'sharpe_ratio': 1.0, 'vwr': 3.0, 'num_trades': 10},  # rank 2, rank 1 = 1.5
+            {'params': {'period': 20}, 'sharpe_ratio': 2.0, 'vwr': 2.0, 'num_trades': 5},   # rank 1, rank 2 = 1.5
+            {'params': {'period': 30}, 'sharpe_ratio': 0.5, 'vwr': 1.0, 'num_trades': 8},   # rank 3, rank 3 = 3.0
+        ]
+
+        best_params = selector.select(trials)
+
+        # Period 10 or 20 should be selected (tied best average rank)
+        assert best_params['period'] in [10, 20]
+
+    def test_selector_min_thresholds(self):
+        """Test that minimum thresholds filter out poor solutions"""
+        from engine_v2.multi_objective_selector import MultiObjectiveConfig, MultiObjectiveSelector
+
+        config = MultiObjectiveConfig(
+            method='weighted',
+            metrics=['sharpe_ratio', 'vwr'],
+            min_thresholds={'sharpe_ratio': 0.0, 'num_trades': 1},
+        )
+        selector = MultiObjectiveSelector(config)
+
+        trials = [
+            {'params': {'period': 10}, 'sharpe_ratio': -0.5, 'vwr': 2.0, 'num_trades': 10},  # Filtered (negative Sharpe)
+            {'params': {'period': 20}, 'sharpe_ratio': 0.5, 'vwr': 1.0, 'num_trades': 5},
+            {'params': {'period': 30}, 'sharpe_ratio': 1.0, 'vwr': 0.5, 'num_trades': 0},    # Filtered (0 trades)
+        ]
+
+        best_params = selector.select(trials)
+
+        # Only period=20 passes thresholds
+        assert best_params['period'] == 20
+
+    def test_selector_get_pareto_front(self):
+        """Test getting the full Pareto front"""
+        from engine_v2.multi_objective_selector import MultiObjectiveConfig, MultiObjectiveSelector
+
+        config = MultiObjectiveConfig(
+            method='pareto',
+            metrics=['sharpe_ratio', 'vwr'],
+        )
+        selector = MultiObjectiveSelector(config)
+
+        trials = [
+            {'params': {'period': 10}, 'sharpe_ratio': 1.0, 'vwr': 1.0, 'num_trades': 10},
+            {'params': {'period': 20}, 'sharpe_ratio': 2.0, 'vwr': 0.5, 'num_trades': 5},
+            {'params': {'period': 30}, 'sharpe_ratio': 1.5, 'vwr': 1.5, 'num_trades': 8},
+            {'params': {'period': 40}, 'sharpe_ratio': 0.5, 'vwr': 0.5, 'num_trades': 20},
+        ]
+
+        pareto_front = selector.get_pareto_front(trials)
+
+        # Should return the Pareto-optimal trials
+        pareto_periods = [t['params']['period'] for t in pareto_front]
+        assert 20 in pareto_periods
+        assert 30 in pareto_periods
+        assert 40 not in pareto_periods
+
+    def test_selector_rank_all(self):
+        """Test ranking all trials"""
+        from engine_v2.multi_objective_selector import MultiObjectiveConfig, MultiObjectiveSelector
+
+        config = MultiObjectiveConfig(
+            method='pareto',
+            metrics=['sharpe_ratio', 'vwr'],
+        )
+        selector = MultiObjectiveSelector(config)
+
+        trials = [
+            {'params': {'period': 10}, 'sharpe_ratio': 1.0, 'vwr': 1.0, 'num_trades': 10},
+            {'params': {'period': 20}, 'sharpe_ratio': 2.0, 'vwr': 0.5, 'num_trades': 5},
+        ]
+
+        df = selector.rank_all(trials)
+
+        assert 'weighted_score' in df.columns
+        assert 'rank_avg_score' in df.columns
+        assert 'is_pareto_optimal' in df.columns
+        assert len(df) == 2
+
+    def test_selector_with_returns(self):
+        """Test selector computes extended metrics from returns"""
+        from engine_v2.multi_objective_selector import MultiObjectiveConfig, MultiObjectiveSelector
+
+        config = MultiObjectiveConfig(
+            method='weighted',
+            metrics=['sharpe_ratio', 'sortino_ratio', 'calmar_ratio', 'turnover_penalty'],
+        )
+        selector = MultiObjectiveSelector(config)
+
+        np.random.seed(42)
+        returns_1 = pd.Series(np.random.randn(100) * 0.02 + 0.001)  # Slightly positive
+        returns_2 = pd.Series(np.random.randn(100) * 0.02 - 0.001)  # Slightly negative
+
+        trials = [
+            {'params': {'period': 10}, 'sharpe_ratio': 1.0, 'num_trades': 10, 'returns': returns_1},
+            {'params': {'period': 20}, 'sharpe_ratio': 0.5, 'num_trades': 5, 'returns': returns_2},
+        ]
+
+        best_params = selector.select(trials)
+
+        # Period 10 should be selected (positive returns mean better Sortino/Calmar)
+        assert best_params['period'] == 10
+
+    def test_selector_invalid_method(self):
+        """Test that invalid method raises error"""
+        from engine_v2.multi_objective_selector import MultiObjectiveConfig, MultiObjectiveSelector
+
+        config = MultiObjectiveConfig(method='invalid_method')
+
+        with pytest.raises(ValueError, match="Invalid method"):
+            MultiObjectiveSelector(config)
+
+    def test_selector_empty_trials(self):
+        """Test selector handles empty trials"""
+        from engine_v2.multi_objective_selector import MultiObjectiveConfig, MultiObjectiveSelector
+
+        config = MultiObjectiveConfig(method='pareto')
+        selector = MultiObjectiveSelector(config)
+
+        best_params = selector.select([])
+        assert best_params == {}
+
+
+class TestMultiObjectiveIntegration:
+    """Integration tests for multi-objective selection with walk-forward"""
+
+    def test_walkforward_with_multi_objective_pareto(self, small_data):
+        """Test walk-forward optimization with Pareto-based selection"""
+        strategy = EMACrossStrategy()
+
+        config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=10,
+            use_multi_objective=True,
+            multi_objective_method='pareto',
+            use_dashboard_storage=False,
+        )
+
+        engine = WalkForwardOptuna(
+            data=small_data,
+            strategy=strategy,
+            config=config,
+        )
+
+        result = engine.run()
+
+        # Should produce valid results
+        assert len(result.fold_results) > 0
+        assert len(result.optimal_params_per_fold) == len(result.fold_results)
+        assert result.aggregate_metrics is not None
+
+    def test_walkforward_with_multi_objective_weighted(self, small_data):
+        """Test walk-forward optimization with weighted selection"""
+        strategy = RSIStrategy()
+
+        custom_weights = {
+            'sharpe_ratio': 0.4,
+            'vwr': 0.3,
+            'sortino_ratio': 0.2,
+            'calmar_ratio': 0.1,
+            'turnover_penalty': 0.0,  # Ignore turnover
+        }
+
+        config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=10,
+            use_multi_objective=True,
+            multi_objective_method='weighted',
+            multi_objective_weights=custom_weights,
+            use_dashboard_storage=False,
+        )
+
+        engine = WalkForwardOptuna(
+            data=small_data,
+            strategy=strategy,
+            config=config,
+        )
+
+        result = engine.run()
+
+        assert len(result.fold_results) > 0
+        assert len(result.optimal_params_per_fold) == len(result.fold_results)
+
+    def test_walkforward_with_multi_objective_rank_average(self, small_data):
+        """Test walk-forward optimization with rank average selection"""
+        strategy = EMACrossStrategy()
+
+        config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=10,
+            use_multi_objective=True,
+            multi_objective_method='rank_average',
+            use_dashboard_storage=False,
+        )
+
+        engine = WalkForwardOptuna(
+            data=small_data,
+            strategy=strategy,
+            config=config,
+        )
+
+        result = engine.run()
+
+        assert len(result.fold_results) > 0
+        assert len(result.optimal_params_per_fold) == len(result.fold_results)
+
+    def test_multi_objective_vs_single_metric(self, trending_data):
+        """Test that multi-objective can select different params than single metric"""
+        strategy = RSIStrategy()
+
+        # Single metric optimization
+        config_single = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=15,
+            use_multi_objective=False,
+            optimization_metric='sharpe_ratio',
+            use_dashboard_storage=False,
+        )
+
+        engine_single = WalkForwardOptuna(
+            data=trending_data,
+            strategy=strategy,
+            config=config_single,
+        )
+        result_single = engine_single.run()
+
+        # Multi-objective optimization
+        config_multi = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=15,
+            use_multi_objective=True,
+            multi_objective_method='pareto',
+            use_dashboard_storage=False,
+        )
+
+        engine_multi = WalkForwardOptuna(
+            data=trending_data,
+            strategy=strategy,
+            config=config_multi,
+        )
+        result_multi = engine_multi.run()
+
+        # Both should produce valid results
+        assert len(result_single.fold_results) == len(result_multi.fold_results)
+        assert result_single.aggregate_metrics['avg_sharpe'] is not None
+        assert result_multi.aggregate_metrics['avg_sharpe'] is not None
+
+        # Params may differ between methods (this is the point of multi-objective)
+        print(f"\nSingle metric params: {result_single.optimal_params_per_fold}")
+        print(f"Multi-objective params: {result_multi.optimal_params_per_fold}")
+
+    def test_multi_objective_robustness(self, trending_data):
+        """Test that multi-objective selected params perform well on multiple metrics"""
+        from engine_v2.multi_objective_selector import calculate_extended_metrics
+
+        strategy = EMACrossStrategy()
+
+        config = WalkForwardConfig(
+            num_splits=5,
+            train_splits=2,
+            test_splits=1,
+            n_trials=15,
+            use_multi_objective=True,
+            multi_objective_method='pareto',
+            use_dashboard_storage=False,
+        )
+
+        engine = WalkForwardOptuna(
+            data=trending_data,
+            strategy=strategy,
+            config=config,
+        )
+        result = engine.run()
+
+        # Check that results have reasonable metrics across the board
+        for fold_result in result.fold_results:
+            # Metrics should not be extremely negative
+            if fold_result.num_trades > 0:
+                assert fold_result.sharpe_ratio > -5.0  # Not catastrophically bad
+                # VWR should be defined
+                assert fold_result.vwr is not None
+
+
+# =============================================================================
 # Run tests
 # =============================================================================
 

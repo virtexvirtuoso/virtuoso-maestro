@@ -11,6 +11,20 @@ import os
 # Add parent directory to path for utils imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from .multi_objective_selector import (
+    MultiObjectiveConfig,
+    MultiObjectiveSelector,
+    SelectionMethod,
+    TrialMetrics,
+    calculate_calmar_ratio,
+    calculate_extended_metrics,
+    calculate_sortino_ratio,
+    calculate_turnover_penalty,
+    dominates,
+    pareto_optimal,
+    rank_average_score,
+    weighted_score,
+)
 from .optuna_dashboard_storage import (
     OptunaDashboardStorage,
     create_study_with_dashboard,
@@ -47,6 +61,19 @@ __all__ = [
     'get_default_storage_path',
     'TimeSeriesSplitRolling',
     'WindowMode',
+    # Multi-objective selection (Phase 5.4)
+    'MultiObjectiveConfig',
+    'MultiObjectiveSelector',
+    'SelectionMethod',
+    'TrialMetrics',
+    'calculate_calmar_ratio',
+    'calculate_extended_metrics',
+    'calculate_sortino_ratio',
+    'calculate_turnover_penalty',
+    'dominates',
+    'pareto_optimal',
+    'rank_average_score',
+    'weighted_score',
 ]
 
-__version__ = '2.2.0'  # Bumped for adaptive window modes
+__version__ = '2.3.0'  # Bumped for multi-objective selection
