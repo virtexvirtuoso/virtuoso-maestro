@@ -150,6 +150,7 @@ class Optimization(Resource):
         from engine_v2.vectorbt_engine import VectorBTEngine, BacktestConfig
         from engine_v2.walk_forward_optuna import WalkForwardOptuna, WalkForwardConfig as WFConfig
         from engine_v2.strategy_adapter import STRATEGY_REGISTRY
+        from engine_v2.result_converter import convert_v2_to_v1_schema, convert_walkforward_v2_to_v1
 
         try:
             strategy_name = data['strategy']
@@ -205,6 +206,7 @@ class Optimization(Resource):
         """Run a V2 backtest and return results in V1-compatible schema."""
         from engine_v2.vectorbt_engine import BacktestConfig
         from engine_v2.strategy_adapter import STRATEGY_REGISTRY
+        from engine_v2.result_converter import convert_v2_to_v1_schema
         from datafeed.rethinkdb_datafeed_builder import RethinkDBDataFeedBuilder
 
         # Load data from RethinkDB
@@ -246,27 +248,29 @@ class Optimization(Resource):
             parameters=params
         )
 
-        # Convert to V1-compatible schema
-        return {
-            'sharpe_ratio': result.sharpe_ratio,
-            'vwr': result.vwr,
-            'total_return': result.total_return,
-            'max_drawdown': result.max_drawdown,
-            'win_rate': result.win_rate,
-            'profit_factor': result.profit_factor,
-            'num_trades': result.num_trades,
-            'annual_return': result.annual_return,
-            'volatility': result.volatility,
-            'calmar_ratio': result.calmar_ratio,
-            'sortino_ratio': result.sortino_ratio,
-            'parameters': params,
-            'processing_time': result.processing_time,
-        }
+        # Convert to V1-compatible schema using result_converter
+        v1_result = convert_v2_to_v1_schema(result)
+
+        # Add additional fields for API response compatibility
+        v1_result['sharpe_ratio'] = result.sharpe_ratio
+        v1_result['vwr'] = result.vwr
+        v1_result['total_return'] = result.total_return
+        v1_result['max_drawdown'] = result.max_drawdown
+        v1_result['win_rate'] = result.win_rate
+        v1_result['profit_factor'] = result.profit_factor
+        v1_result['num_trades'] = result.num_trades
+        v1_result['annual_return'] = result.annual_return
+        v1_result['volatility'] = result.volatility
+        v1_result['calmar_ratio'] = result.calmar_ratio
+        v1_result['sortino_ratio'] = result.sortino_ratio
+
+        return v1_result
 
     def _run_v2_walkforward(self, data: dict, engine_cls, tid: str) -> dict:
         """Run V2 walk-forward optimization and return results in V1-compatible schema."""
         from engine_v2.walk_forward_optuna import WalkForwardConfig as WFConfig, BacktestConfig
         from engine_v2.strategy_adapter import STRATEGY_REGISTRY
+        from engine_v2.result_converter import convert_v2_to_v1_schema, convert_walkforward_v2_to_v1
         from datafeed.rethinkdb_datafeed_builder import RethinkDBDataFeedBuilder
 
         # Load data from RethinkDB
@@ -309,19 +313,22 @@ class Optimization(Resource):
 
         result = wf_engine.run()
 
-        # Convert to V1-compatible schema
+        # Convert to V1-compatible schema using result_converter
+        v1_result = convert_walkforward_v2_to_v1(result)
+
+        # Add backward-compatible fields for API response
         fold_results = []
         for i, fold in enumerate(result.fold_results):
-            fold_results.append({
-                'num_split': i,
-                'sharpe_ratio': fold.sharpe_ratio,
-                'vwr': fold.vwr,
-                'total_return': fold.total_return,
-                'max_drawdown': fold.max_drawdown,
-                'win_rate': fold.win_rate,
-                'num_trades': fold.num_trades,
-                'parameters': result.optimal_params_per_fold[i] if i < len(result.optimal_params_per_fold) else {},
-            })
+            fold_v1 = convert_v2_to_v1_schema(fold)
+            fold_v1['num_split'] = i
+            fold_v1['sharpe_ratio'] = fold.sharpe_ratio
+            fold_v1['vwr'] = fold.vwr
+            fold_v1['total_return'] = fold.total_return
+            fold_v1['max_drawdown'] = fold.max_drawdown
+            fold_v1['win_rate'] = fold.win_rate
+            fold_v1['num_trades'] = fold.num_trades
+            fold_v1['parameters'] = result.optimal_params_per_fold[i] if i < len(result.optimal_params_per_fold) else {}
+            fold_results.append(fold_v1)
 
         return {
             'aggregate_metrics': result.aggregate_metrics,
