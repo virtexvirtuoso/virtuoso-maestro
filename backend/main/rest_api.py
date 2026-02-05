@@ -20,6 +20,7 @@ from config.config_reader import ConfigReader, RethinkDbConfig, OptimizationOutp
 from engine.backtesting_engine import BacktestingEngine
 from engine.optimizer import Optimizer, OptimizationType
 from engine.walk_forward_engine import WalkForwardEngine
+from engine.engine_factory import EngineFactory
 from datetime import datetime, timedelta
 
 ROOT_DIR = Path(__file__).parents[1].absolute()
@@ -103,6 +104,12 @@ class Optimization(Resource):
         data = request.get_json()
         if not data:
             abort(400)
+
+        # Route to V2 engine if specified
+        engine_version = data.get('engine_version', 'v1')
+        if engine_version == 'v2':
+            return self._run_v2_optimization(data)
+
         try:
 
             engines = self._get_engines(kind=data['kind'])
@@ -137,6 +144,190 @@ class Optimization(Resource):
             return results
         except Exception as e:
             abort(500, error=str(e))
+
+    def _run_v2_optimization(self, data: dict):
+        """Run optimization using V2 engine (VectorBT + Optuna)."""
+        from engine_v2.vectorbt_engine import VectorBTEngine, BacktestConfig
+        from engine_v2.walk_forward_optuna import WalkForwardOptuna, WalkForwardConfig as WFConfig
+        from engine_v2.strategy_adapter import STRATEGY_REGISTRY
+
+        try:
+            strategy_name = data['strategy']
+
+            # Validate strategy is available in V2
+            if strategy_name not in STRATEGY_REGISTRY:
+                abort(400, error=f'Strategy {strategy_name} not available in V2 engine. '
+                      f'Available: {list(STRATEGY_REGISTRY.keys())}')
+
+            # Build results metadata
+            test_name = data['test_name']
+            tid = hashlib.sha1(test_name.encode('utf-8')).hexdigest()
+
+            results = {
+                'tid': tid,
+                'test_name': test_name,
+                'symbol': data['symbol'],
+                'bin_size': data['bin_size'],
+                'optimization_types': data['kind'],
+                'engine_version': 'v2',
+                'status': 'submitted'
+            }
+
+            kind = data['kind']
+
+            # Use EngineFactory to create V2 engines
+            if kind == 'BACKTESTING':
+                engine = EngineFactory.create_backtest_engine('v2')
+                # Run V2 backtest
+                result = self._run_v2_backtest(data, engine, tid)
+                results['backtest_result'] = result
+            elif kind == 'WALKFORWARD':
+                engine = EngineFactory.create_walkforward_engine('v2')
+                # Run V2 walk-forward
+                result = self._run_v2_walkforward(data, engine, tid)
+                results['walkforward_result'] = result
+            elif kind == 'BOTH':
+                bt_engine = EngineFactory.create_backtest_engine('v2')
+                wf_engine = EngineFactory.create_walkforward_engine('v2')
+                results['backtest_result'] = self._run_v2_backtest(data, bt_engine, tid)
+                results['walkforward_result'] = self._run_v2_walkforward(data, wf_engine, tid)
+            else:
+                abort(400, error=f'Unknown optimization kind: {kind}')
+
+            results['status'] = 'completed'
+            return results
+
+        except Exception as e:
+            import traceback
+            abort(500, error=f'V2 optimization failed: {str(e)}\n{traceback.format_exc()}')
+
+    def _run_v2_backtest(self, data: dict, engine, tid: str) -> dict:
+        """Run a V2 backtest and return results in V1-compatible schema."""
+        from engine_v2.vectorbt_engine import BacktestConfig
+        from engine_v2.strategy_adapter import STRATEGY_REGISTRY
+        from datafeed.rethinkdb_datafeed_builder import RethinkDBDataFeedBuilder
+
+        # Load data from RethinkDB
+        datafeed_builder = RethinkDBDataFeedBuilder(rethinkdb_config=self.rethinkdb_config)
+        df = datafeed_builder.build_dataframe(
+            provider=DataSourceProviders[data['provider']],
+            symbol=data['symbol'],
+            bin_size=data['bin_size'],
+            start_date=datetime.fromtimestamp(data['start_date'] / 1000).astimezone(pytz.UTC),
+            end_date=datetime.fromtimestamp(data['end_date'] / 1000).astimezone(pytz.UTC)
+        )
+
+        # Create strategy instance
+        strategy_cls = STRATEGY_REGISTRY[data['strategy']]
+        strategy = strategy_cls()
+
+        # Get parameters
+        params = data.get('strategy_params', {})
+        if not params:
+            params = strategy.get_params()
+
+        # Generate signals
+        signals = strategy.generate_signals(df, params)
+
+        # Configure backtest
+        config = BacktestConfig(
+            cash=float(data['cash']),
+            commission=float(data['commissions']),
+        )
+        engine.config = config
+
+        # Run backtest
+        result = engine.run(
+            data=df,
+            entries=signals.entries,
+            exits=signals.exits,
+            short_entries=signals.short_entries,
+            short_exits=signals.short_exits,
+            parameters=params
+        )
+
+        # Convert to V1-compatible schema
+        return {
+            'sharpe_ratio': result.sharpe_ratio,
+            'vwr': result.vwr,
+            'total_return': result.total_return,
+            'max_drawdown': result.max_drawdown,
+            'win_rate': result.win_rate,
+            'profit_factor': result.profit_factor,
+            'num_trades': result.num_trades,
+            'annual_return': result.annual_return,
+            'volatility': result.volatility,
+            'calmar_ratio': result.calmar_ratio,
+            'sortino_ratio': result.sortino_ratio,
+            'parameters': params,
+            'processing_time': result.processing_time,
+        }
+
+    def _run_v2_walkforward(self, data: dict, engine_cls, tid: str) -> dict:
+        """Run V2 walk-forward optimization and return results in V1-compatible schema."""
+        from engine_v2.walk_forward_optuna import WalkForwardConfig as WFConfig, BacktestConfig
+        from engine_v2.strategy_adapter import STRATEGY_REGISTRY
+        from datafeed.rethinkdb_datafeed_builder import RethinkDBDataFeedBuilder
+
+        # Load data from RethinkDB
+        datafeed_builder = RethinkDBDataFeedBuilder(rethinkdb_config=self.rethinkdb_config)
+        df = datafeed_builder.build_dataframe(
+            provider=DataSourceProviders[data['provider']],
+            symbol=data['symbol'],
+            bin_size=data['bin_size'],
+            start_date=datetime.fromtimestamp(data['start_date'] / 1000).astimezone(pytz.UTC),
+            end_date=datetime.fromtimestamp(data['end_date'] / 1000).astimezone(pytz.UTC)
+        )
+
+        # Create strategy instance
+        strategy_cls = STRATEGY_REGISTRY[data['strategy']]
+        strategy = strategy_cls()
+
+        # Configure walk-forward
+        wf_config = WFConfig(
+            num_splits=self.walkforward_config.num_splits,
+            n_trials=data.get('n_trials', 50),
+            use_vwr_ranking=True,
+        )
+
+        backtest_config = BacktestConfig(
+            cash=float(data['cash']),
+            commission=float(data['commissions']),
+        )
+
+        # Create and run walk-forward engine
+        wf_engine = engine_cls(
+            data=df,
+            strategy=strategy,
+            config=wf_config,
+            backtest_config=backtest_config,
+            tid=tid,
+            test_name=data['test_name'],
+            rethinkdb_config=self.rethinkdb_config,
+            optimization_output=self.optimization_output,
+        )
+
+        result = wf_engine.run()
+
+        # Convert to V1-compatible schema
+        fold_results = []
+        for i, fold in enumerate(result.fold_results):
+            fold_results.append({
+                'num_split': i,
+                'sharpe_ratio': fold.sharpe_ratio,
+                'vwr': fold.vwr,
+                'total_return': fold.total_return,
+                'max_drawdown': fold.max_drawdown,
+                'win_rate': fold.win_rate,
+                'num_trades': fold.num_trades,
+                'parameters': result.optimal_params_per_fold[i] if i < len(result.optimal_params_per_fold) else {},
+            })
+
+        return {
+            'aggregate_metrics': result.aggregate_metrics,
+            'fold_results': fold_results,
+            'processing_time': result.total_processing_time,
+        }
 
     @staticmethod
     def _get_engines(kind: str):
