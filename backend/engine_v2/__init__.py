@@ -19,7 +19,7 @@ from .parallel_walk_forward import (
 )
 from .strategy_adapter import StrategyAdapter, VectorBTStrategy
 from .vectorbt_engine import VectorBTEngine
-from .walk_forward_optuna import WalkForwardOptuna
+from .walk_forward_optuna import WalkForwardOptuna, create_optimized_study
 
 __all__ = [
     'VectorBTEngine',
@@ -32,6 +32,7 @@ __all__ = [
     'VectorBTStrategy',
     'OptunaDashboardStorage',
     'create_study_with_dashboard',
+    'create_optimized_study',
     'get_storage_url',
     'get_default_storage_path',
 ]

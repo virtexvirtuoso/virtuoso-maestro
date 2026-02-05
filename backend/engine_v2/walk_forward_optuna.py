@@ -324,11 +324,27 @@ class WalkForwardOptuna(Thread):
             try:
                 result = self._backtest_with_params(train_data, params)
 
+                # Step 1: Report intermediate value - total return (quick metric)
+                # This allows Hyperband pruner to terminate unpromising trials early
+                total_return = result.total_return if not pd.isna(result.total_return) else 0.0
+                trial.report(total_return, step=0)
+
+                # Check if trial should be pruned based on total return
+                if trial.should_prune():
+                    raise optuna.TrialPruned()
+
+                # Step 2: Report Sharpe ratio as second intermediate value
+                sharpe = result.sharpe_ratio if not pd.isna(result.sharpe_ratio) else 0.0
+                trial.report(sharpe, step=1)
+
+                # Check if trial should be pruned based on Sharpe
+                if trial.should_prune():
+                    raise optuna.TrialPruned()
+
                 # Return optimization metric
                 # When use_vwr_ranking is enabled, combine Sharpe and VWR for ranking
                 # This matches V1 behavior: sort_values(by=['sharpe_ratio', 'vwr'])
                 if self.config.use_vwr_ranking:
-                    sharpe = result.sharpe_ratio if not pd.isna(result.sharpe_ratio) else 0.0
                     vwr = result.vwr if not pd.isna(result.vwr) else 0.0
                     # Combined score: primary by Sharpe, secondary by VWR
                     # Scale VWR to be a secondary factor (add small fraction)
@@ -342,13 +358,26 @@ class WalkForwardOptuna(Thread):
 
                 return metric
 
+            except optuna.TrialPruned:
+                # Re-raise pruned exception
+                raise
             except Exception as e:
                 self.logger.debug(f"Trial failed: {e}")
                 return float('-inf')
 
         # Create Optuna study - use dashboard storage if enabled
-        sampler = TPESampler(seed=42 + fold_idx)
-        pruner = MedianPruner(n_startup_trials=self.config.n_startup_trials) if self.config.pruning_enabled else None
+        # TPESampler with multivariate=True for better parameter correlation modeling
+        sampler = TPESampler(
+            n_startup_trials=self.config.n_startup_trials,
+            multivariate=True,
+            seed=42 + fold_idx
+        )
+        # HyperbandPruner for efficient early stopping of unpromising trials
+        pruner = HyperbandPruner(
+            min_resource=1,
+            max_resource=self.config.num_splits,
+            reduction_factor=3
+        ) if self.config.pruning_enabled else None
 
         if self.config.use_dashboard_storage:
             # Use SQLite storage for dashboard visualization
@@ -636,3 +665,67 @@ def compare_strategies(
         })
 
     return pd.DataFrame(results)
+
+
+def create_optimized_study(
+    strategy_name: str,
+    n_startup_trials: int = 10,
+    storage_url: str = None,
+    num_splits: int = 10,
+) -> optuna.Study:
+    """
+    Create an optimized Optuna study with TPE sampler and Hyperband pruner.
+
+    This function creates a study configured for walk-forward optimization with:
+    - TPESampler with multivariate correlation and warm-starting
+    - HyperbandPruner for efficient early stopping
+    - SQLite storage for dashboard visualization and warm-starts
+
+    Args:
+        strategy_name: Name of the strategy (used in study name)
+        n_startup_trials: Number of random trials before TPE kicks in
+        storage_url: SQLite storage URL (auto-generated if None)
+        num_splits: Number of walk-forward splits (used for Hyperband max_resource)
+
+    Returns:
+        Configured Optuna study ready for optimization
+
+    Example:
+        study = create_optimized_study('ema_cross', n_startup_trials=15)
+        study.optimize(objective, n_trials=100)
+    """
+    # Configure TPESampler with multivariate modeling for better parameter correlation
+    sampler = TPESampler(
+        n_startup_trials=n_startup_trials,
+        multivariate=True,
+        seed=42
+    )
+
+    # Configure HyperbandPruner for early stopping
+    # min_resource: minimum step before pruning can occur
+    # max_resource: maximum step (based on walk-forward splits)
+    # reduction_factor: how aggressively to prune (3 = SHA bracket style)
+    pruner = HyperbandPruner(
+        min_resource=1,
+        max_resource=max(num_splits, 10),
+        reduction_factor=3
+    )
+
+    # Get storage URL
+    if storage_url is None:
+        storage_url = get_storage_url()
+
+    # Create study name
+    study_name = f"maestro_{strategy_name}"
+
+    # Create study with persistence for warm-starting
+    study = optuna.create_study(
+        study_name=study_name,
+        direction='maximize',
+        sampler=sampler,
+        pruner=pruner,
+        storage=storage_url,
+        load_if_exists=True  # Enable warm-starting
+    )
+
+    return study
