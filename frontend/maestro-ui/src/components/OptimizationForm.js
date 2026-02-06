@@ -8,7 +8,7 @@ import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import PlayCircleFilledWhiteIcon from '@mui/icons-material/PlayCircleFilledWhite';
-import LinearProgressWithLabel from './LinearProgressWithLabel';
+import OptimizationProgress from './OptimizationProgress';
 import TextField from '@mui/material/TextField';
 import FormLabel from '@mui/material/FormLabel';
 import RadioGroup from '@mui/material/RadioGroup';
@@ -47,7 +47,7 @@ export default function OptimizationForm() {
   const { notify } = useNotification();
 
   // Use WebSocket progress hook with polling fallback
-  const { progress, isComplete, error: progressError, status } = useOptimizationProgress(
+  const { progress, isConnected, isComplete, error: progressError, status } = useOptimizationProgress(
     runningTid,
     isRunning
   );
@@ -341,9 +341,14 @@ export default function OptimizationForm() {
           </Box>
         </Grid>
         {isRunning && (
-          <Grid>
-            <LinearProgressWithLabel value={progress.percent} />
-          </Grid>
+          <OptimizationProgress
+            tid={runningTid}
+            progress={progress}
+            status={status}
+            isConnected={isConnected}
+            isComplete={isComplete}
+            error={progressError}
+          />
         )}
       </React.Fragment>
     </LocalizationProvider>
