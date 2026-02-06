@@ -14,12 +14,11 @@ import FormLabel from '@mui/material/FormLabel';
 import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Radio from '@mui/material/Radio';
-import Snackbar from '@mui/material/Snackbar';
-import Alert from '@mui/material/Alert';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useOptimizationProgress } from '../hooks/useOptimizationProgress';
+import { useNotification } from '../context/NotificationContext';
 
 const formControlSx = { m: 0.5, minWidth: 120 };
 
@@ -43,7 +42,9 @@ export default function OptimizationForm() {
   const [paramValues, setParamValues] = useState({});
   const [startDate, setStartDate] = useState(new Date(2000, 1, 1));
   const [endDate, setEndDate] = useState(new Date());
-  const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
+
+  // Centralized notification system
+  const { notify } = useNotification();
 
   // Use WebSocket progress hook with polling fallback
   const { progress, isComplete, error: progressError, status } = useOptimizationProgress(
@@ -59,8 +60,8 @@ export default function OptimizationForm() {
         setStrategiesParameters(Object.keys(data));
         setParamValues(data);
       })
-      .catch((e) => alert(`Something went wrong: ${e}`));
-  }, []);
+      .catch((e) => notify(`Failed to load strategy params: ${e}`, 'error'));
+  }, [notify]);
 
   const updateSymbolsAvailable = useCallback((providerName) => {
     if (!providerName) return;
@@ -70,8 +71,8 @@ export default function OptimizationForm() {
         setSymbols(data);
         setSymbol(data.length > 0 ? data[0] : '');
       })
-      .catch((e) => alert(`Something went wrong: ${e}`));
-  }, []);
+      .catch((e) => notify(`Failed to load symbols: ${e}`, 'error'));
+  }, [notify]);
 
   useEffect(() => {
     fetch(`${process.env.REACT_APP_REST_API_URL}/strategy/available`)
@@ -83,7 +84,7 @@ export default function OptimizationForm() {
           updateStrategyParams(data[0]);
         }
       })
-      .catch((e) => alert(`Something went wrong: ${e}`));
+      .catch((e) => notify(`Failed to load strategies: ${e}`, 'error'));
 
     fetch(`${process.env.REACT_APP_REST_API_URL}/datasource/available`)
       .then((response) => response.json())
@@ -94,28 +95,20 @@ export default function OptimizationForm() {
           updateSymbolsAvailable(data[0]);
         }
       })
-      .catch((e) => alert(`Something went wrong: ${e}`));
-  }, [updateStrategyParams, updateSymbolsAvailable]);
+      .catch((e) => notify(`Failed to load data sources: ${e}`, 'error'));
+  }, [updateStrategyParams, updateSymbolsAvailable, notify]);
 
   // Handle optimization completion
   useEffect(() => {
     if (isComplete && isRunning) {
       setIsRunning(false);
       if (progressError) {
-        setNotification({
-          open: true,
-          message: `Optimization failed: ${progressError}`,
-          severity: 'error',
-        });
+        notify(`Optimization failed: ${progressError}`, 'error');
       } else if (status === 'completed') {
-        setNotification({
-          open: true,
-          message: 'Optimization completed successfully!',
-          severity: 'success',
-        });
+        notify('Optimization completed!', 'success');
       }
     }
-  }, [isComplete, isRunning, progressError, status]);
+  }, [isComplete, isRunning, progressError, status, notify]);
 
   const handleProviderChange = (e) => {
     const value = e.target.value;
@@ -180,14 +173,10 @@ export default function OptimizationForm() {
         }
       })
       .catch((e) => {
-        alert(`Something went wrong: ${e}`);
+        notify(`Failed to start optimization: ${e}`, 'error');
         setIsRunning(false);
         setRunningTid(null);
       });
-  };
-
-  const handleCloseNotification = () => {
-    setNotification((prev) => ({ ...prev, open: false }));
   };
 
   return (
@@ -356,21 +345,6 @@ export default function OptimizationForm() {
             <LinearProgressWithLabel value={progress.percent} />
           </Grid>
         )}
-        <Snackbar
-          open={notification.open}
-          autoHideDuration={6000}
-          onClose={handleCloseNotification}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert
-            onClose={handleCloseNotification}
-            severity={notification.severity}
-            variant="filled"
-            sx={{ width: '100%' }}
-          >
-            {notification.message}
-          </Alert>
-        </Snackbar>
       </React.Fragment>
     </LocalizationProvider>
   );

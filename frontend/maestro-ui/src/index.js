@@ -8,6 +8,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import theme from './theme';
 import './index.css';
 import Dashboard from './components/Dashboard';
+import { NotificationProvider } from './context/NotificationContext';
 
 // Configure React Query client
 const queryClient = new QueryClient({
@@ -30,11 +31,13 @@ root.render(
   <React.StrictMode>
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <App />
-        </BrowserRouter>
-      </QueryClientProvider>
+      <NotificationProvider>
+        <QueryClientProvider client={queryClient}>
+          <BrowserRouter>
+            <App />
+          </BrowserRouter>
+        </QueryClientProvider>
+      </NotificationProvider>
     </ThemeProvider>
   </React.StrictMode>
 );
