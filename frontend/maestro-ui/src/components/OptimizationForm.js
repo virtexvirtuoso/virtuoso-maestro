@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Title from './Title';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
@@ -14,9 +14,12 @@ import FormLabel from '@mui/material/FormLabel';
 import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Radio from '@mui/material/Radio';
+import Snackbar from '@mui/material/Snackbar';
+import Alert from '@mui/material/Alert';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { useOptimizationProgress } from '../hooks/useOptimizationProgress';
 
 const formControlSx = { m: 0.5, minWidth: 120 };
 
@@ -31,7 +34,7 @@ export default function OptimizationForm() {
   const [strategies, setStrategies] = useState([]);
   const [optType, setOptType] = useState('BACKTESTING');
   const [isRunning, setIsRunning] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [runningTid, setRunningTid] = useState(null);
   const [isError, setIsError] = useState(false);
   const [testNameHelperText, setTestNameHelperText] = useState('');
   const [cash, setCash] = useState(10000);
@@ -40,8 +43,13 @@ export default function OptimizationForm() {
   const [paramValues, setParamValues] = useState({});
   const [startDate, setStartDate] = useState(new Date(2000, 1, 1));
   const [endDate, setEndDate] = useState(new Date());
+  const [notification, setNotification] = useState({ open: false, message: '', severity: 'success' });
 
-  const timerRef = useRef(null);
+  // Use WebSocket progress hook with polling fallback
+  const { progress, isComplete, error: progressError, status } = useOptimizationProgress(
+    runningTid,
+    isRunning
+  );
 
   const updateStrategyParams = useCallback((strategyName) => {
     if (!strategyName) return;
@@ -89,13 +97,25 @@ export default function OptimizationForm() {
       .catch((e) => alert(`Something went wrong: ${e}`));
   }, [updateStrategyParams, updateSymbolsAvailable]);
 
+  // Handle optimization completion
   useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
+    if (isComplete && isRunning) {
+      setIsRunning(false);
+      if (progressError) {
+        setNotification({
+          open: true,
+          message: `Optimization failed: ${progressError}`,
+          severity: 'error',
+        });
+      } else if (status === 'completed') {
+        setNotification({
+          open: true,
+          message: 'Optimization completed successfully!',
+          severity: 'success',
+        });
       }
-    };
-  }, []);
+    }
+  }, [isComplete, isRunning, progressError, status]);
 
   const handleProviderChange = (e) => {
     const value = e.target.value;
@@ -152,45 +172,22 @@ export default function OptimizationForm() {
           setIsError(true);
           setTestNameHelperText(data['error']);
           setIsRunning(false);
+          setRunningTid(null);
         } else {
+          // Start tracking via WebSocket hook
+          setRunningTid(data['tid']);
           setIsRunning(true);
-          setProgress(0);
-
-          timerRef.current = setInterval(() => {
-            fetch(`${process.env.REACT_APP_REST_API_URL}/optimization/progress/${data['tid']}`)
-              .then((response) => Promise.all([response.status, response.json()]))
-              .then(([, progressData]) => {
-                let newProgress = 0;
-                if (Object.keys(progressData).length > 0) {
-                  let current = 0;
-                  let total = 0;
-
-                  for (let testType of ['BACKTESTING', 'WALKFORWARD']) {
-                    const curTest = progressData['optimizations'][testType];
-
-                    if (
-                      curTest !== undefined &&
-                      (optType === testType ||
-                        optType === 'BOTH' ||
-                        curTest['current'] < curTest['total'])
-                    ) {
-                      current += curTest['current'];
-                      total += curTest['total'];
-                    }
-                  }
-                  newProgress = (current / total) * 100;
-                }
-
-                setProgress(newProgress);
-                if (newProgress >= 100) {
-                  clearInterval(timerRef.current);
-                }
-              })
-              .catch((e) => alert(`Something went wrong: ${e}`));
-          }, 800);
         }
       })
-      .catch((e) => alert(`Something went wrong: ${e}`));
+      .catch((e) => {
+        alert(`Something went wrong: ${e}`);
+        setIsRunning(false);
+        setRunningTid(null);
+      });
+  };
+
+  const handleCloseNotification = () => {
+    setNotification((prev) => ({ ...prev, open: false }));
   };
 
   return (
@@ -356,9 +353,24 @@ export default function OptimizationForm() {
         </Grid>
         {isRunning && (
           <Grid>
-            <LinearProgressWithLabel value={progress} />
+            <LinearProgressWithLabel value={progress.percent} />
           </Grid>
         )}
+        <Snackbar
+          open={notification.open}
+          autoHideDuration={6000}
+          onClose={handleCloseNotification}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert
+            onClose={handleCloseNotification}
+            severity={notification.severity}
+            variant="filled"
+            sx={{ width: '100%' }}
+          >
+            {notification.message}
+          </Alert>
+        </Snackbar>
       </React.Fragment>
     </LocalizationProvider>
   );
