@@ -30,6 +30,8 @@ import HeatMapChart from './HeatMap';
 import WalkForwardTimeline from './WalkForwardTimeline';
 import ParameterStabilityChart from './ParameterStabilityChart';
 import OptunaVisualization from './OptunaVisualization';
+import QuantStatsReport from './QuantStatsReport';
+import MonthlyReturnsHeatmap from './MonthlyReturnsHeatmap';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
@@ -534,6 +536,53 @@ export default function Evaluation() {
     );
   };
 
+  const getQuantStatsReport = () => {
+    if (Object.keys(results).length === 0) {
+      return <NoDataMsg />;
+    }
+
+    // Try to get QuantStats data from various possible locations in the API response
+    const quantStats = results['quantstats'] || results['quant_stats'] || results['metrics'];
+
+    // Also check if metrics are nested in backtesting results
+    const backtestData = results['optimizations']?.['BACKTESTING']?.[0];
+    const pyfolioMetrics = backtestData?.['analyzers']?.['PyFolio'];
+
+    // Build a combined metrics object from available data
+    if (!quantStats && !pyfolioMetrics) {
+      return <p>QuantStats not available. Run an optimization with QuantStats analyzer enabled.</p>;
+    }
+
+    // If we have PyFolio metrics, transform them to QuantStats-like format
+    const metricsData = quantStats || {
+      total_return: pyfolioMetrics?.['Cumulative returns'],
+      cagr: pyfolioMetrics?.['Annual return'],
+      volatility: pyfolioMetrics?.['Annual volatility'],
+      max_drawdown: pyfolioMetrics?.['Max drawdown'],
+      sharpe: pyfolioMetrics?.['Sharpe ratio'],
+      sortino: pyfolioMetrics?.['Sortino ratio'],
+      calmar: pyfolioMetrics?.['Calmar ratio'],
+      daily_var: pyfolioMetrics?.['Daily value at risk'],
+    };
+
+    return <QuantStatsReport data={metricsData} />;
+  };
+
+  const getMonthlyReturnsHeatmap = () => {
+    if (Object.keys(results).length === 0) {
+      return <NoDataMsg />;
+    }
+
+    // Try to get monthly returns data from various possible locations
+    const monthlyReturns = results['monthly_returns'] || results['monthlyReturns'];
+
+    if (!monthlyReturns) {
+      return <p>Monthly returns data not available. This requires QuantStats or monthly aggregation enabled.</p>;
+    }
+
+    return <MonthlyReturnsHeatmap data={monthlyReturns} />;
+  };
+
   // Show EmptyState if no test is selected and no data loaded
   if (!tid && Object.keys(results).length === 0) {
     return (
@@ -635,6 +684,18 @@ export default function Evaluation() {
         <Paper sx={paperSx}>
           <Title>Walk Forward</Title>
           <WalkForwardMetrics tid={tid} data={results} />
+        </Paper>
+      </Grid>
+      <Grid item xs={12}>
+        <Paper sx={paperSx}>
+          <Title>QuantStats Report</Title>
+          {getQuantStatsReport()}
+        </Paper>
+      </Grid>
+      <Grid item xs={12}>
+        <Paper sx={paperSx}>
+          <Title>Monthly Returns Heatmap</Title>
+          {getMonthlyReturnsHeatmap()}
         </Paper>
       </Grid>
       <Grid item xs={12}>
