@@ -27,6 +27,8 @@ import IconButton from '@mui/material/IconButton';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import WalkForwardMetrics from './WalkForwardMetrics';
 import HeatMapChart from './HeatMap';
+import WalkForwardTimeline from './WalkForwardTimeline';
+import ParameterStabilityChart from './ParameterStabilityChart';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
@@ -448,6 +450,62 @@ export default function Evaluation() {
     return <HeatMapChart tid={results['tid']} />;
   };
 
+  const getWalkForwardTimeline = () => {
+    if (Object.keys(results).length === 0) {
+      return <NoDataMsg />;
+    }
+
+    const walkforwardData = results['optimizations']?.['WALKFORWARD'];
+    if (!walkforwardData || walkforwardData.length === 0) {
+      return <p>No walk-forward data available.</p>;
+    }
+
+    // Extract split timeline data - using available date fields from each split
+    const splits = walkforwardData.map((split) => ({
+      num_split: split.num_split,
+      train_start: split.train_start || split.start_date,
+      train_end: split.train_end || split.end_date,
+      test_start: split.test_start,
+      test_end: split.test_end || split.end_date,
+      start_date: split.start_date,
+      end_date: split.end_date,
+    }));
+
+    return (
+      <WalkForwardTimeline
+        splits={splits}
+        startDate={results['start_date']}
+        endDate={results['end_date']}
+      />
+    );
+  };
+
+  const getParameterStabilityChart = () => {
+    if (Object.keys(results).length === 0) {
+      return <NoDataMsg />;
+    }
+
+    const walkforwardData = results['optimizations']?.['WALKFORWARD'];
+    if (!walkforwardData || walkforwardData.length === 0) {
+      return <p>No walk-forward data available.</p>;
+    }
+
+    // Check if there are any parameters
+    if (
+      !results['parameters'] ||
+      Object.keys(results['parameters']).length === 0
+    ) {
+      return <p>Current strategy does not have any custom parameters to analyze.</p>;
+    }
+
+    return (
+      <ParameterStabilityChart
+        walkforwardData={walkforwardData}
+        parameterRanges={results['parameters']}
+      />
+    );
+  };
+
   // Show EmptyState if no test is selected and no data loaded
   if (!tid && Object.keys(results).length === 0) {
     return (
@@ -549,6 +607,18 @@ export default function Evaluation() {
         <Paper sx={paperSx}>
           <Title>Walk Forward</Title>
           <WalkForwardMetrics tid={tid} data={results} />
+        </Paper>
+      </Grid>
+      <Grid item xs={12}>
+        <Paper sx={paperSx}>
+          <Title>Walk-Forward Timeline</Title>
+          {getWalkForwardTimeline()}
+        </Paper>
+      </Grid>
+      <Grid item xs={12}>
+        <Paper sx={paperSx}>
+          <Title>Parameter Stability</Title>
+          {getParameterStabilityChart()}
         </Paper>
       </Grid>
       <Grid item xs={12}>
