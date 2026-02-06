@@ -35,6 +35,8 @@ import DateRangeIcon from '@mui/icons-material/DateRange';
 import BusinessIcon from '@mui/icons-material/Business';
 import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
+import EmptyState from './EmptyState';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 
 const paperSx = {
   p: 2,
@@ -445,6 +447,53 @@ export default function Evaluation() {
 
     return <HeatMapChart tid={results['tid']} />;
   };
+
+  // Show EmptyState if no test is selected and no data loaded
+  if (!tid && Object.keys(results).length === 0) {
+    return (
+      <Grid container spacing={3}>
+        <Grid item xs={12}>
+          <Paper sx={paperSx}>
+            <Title>Tests</Title>
+            {availableTests.length === 0 ? (
+              <EmptyState
+                icon={AssessmentIcon}
+                title="No Data Loaded"
+                description="No optimization tests are available. Run a test first to see evaluation results."
+              />
+            ) : (
+              <>
+                <FormControl sx={formControlSx}>
+                  <InputLabel id="test-select-label">Test</InputLabel>
+                  <Select
+                    labelId="test-select-label"
+                    id="test-select"
+                    name="test"
+                    value={tid}
+                    label="Test"
+                    onChange={handleInputChange}
+                  >
+                    {availableTests
+                      .sort((a, b) => (a['test_name'] < b['test_name'] ? -1 : 1))
+                      .map((row) => (
+                        <MenuItem key={row['tid']} value={row['tid']}>
+                          {row['test_name']}
+                        </MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+                <EmptyState
+                  icon={AssessmentIcon}
+                  title="Select a Test"
+                  description="Choose an optimization test from the dropdown above to view detailed evaluation results."
+                />
+              </>
+            )}
+          </Paper>
+        </Grid>
+      </Grid>
+    );
+  }
 
   return (
     <Grid container spacing={3}>

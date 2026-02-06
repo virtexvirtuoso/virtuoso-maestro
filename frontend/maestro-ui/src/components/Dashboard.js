@@ -18,6 +18,7 @@ import OptimizationResults from './OptimizationResults';
 import Home from './Home';
 import MainListItems from './ListItems';
 import Evaluation from './Evaluation';
+import ErrorBoundary from './ErrorBoundary';
 
 function Copyright() {
   return (
@@ -159,12 +160,14 @@ export default function Dashboard() {
       >
         <Toolbar />
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/results" element={<OptimizationResults />} />
-            <Route path="/evaluate" element={<Evaluation />} />
-            <Route path="/evaluate/:tid" element={<Evaluation />} />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/results" element={<OptimizationResults />} />
+              <Route path="/evaluate" element={<Evaluation />} />
+              <Route path="/evaluate/:tid" element={<Evaluation />} />
+            </Routes>
+          </ErrorBoundary>
           <Box pt={4}>
             <Copyright />
           </Box>

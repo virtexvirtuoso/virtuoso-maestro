@@ -16,6 +16,8 @@ import { TreeItem } from '@mui/x-tree-view/TreeItem';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EmptyState from './EmptyState';
+import ScienceIcon from '@mui/icons-material/Science';
 
 function PerformedTests({ rowElement }) {
   const tests = Object.keys(rowElement);
@@ -90,6 +92,10 @@ export default function OptimizationResults() {
     [fetchResults]
   );
 
+  const handleRunTest = useCallback(() => {
+    navigate('/');
+  }, [navigate]);
+
   return (
     <Grid container spacing={3}>
       <Grid item xs={12}>
@@ -102,45 +108,55 @@ export default function OptimizationResults() {
           }}
         >
           <Title>Results</Title>
-          <TableContainer>
-            <Table aria-label="Results Table" size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Creation Time</TableCell>
-                  <TableCell>Strategy</TableCell>
-                  <TableCell>Provider</TableCell>
-                  <TableCell>Symbol</TableCell>
-                  <TableCell>Timeframe</TableCell>
-                  <TableCell>Tests</TableCell>
-                  <TableCell />
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {results.map((row) => (
-                  <TableRow key={row['tid']} hover>
-                    <TableCell>{row['test_name']}</TableCell>
-                    <TableCell>{new Date(row['creation_time']).toLocaleString()}</TableCell>
-                    <TableCell>{row['strategy']}</TableCell>
-                    <TableCell>{row['provider']}</TableCell>
-                    <TableCell>{row['symbol']}</TableCell>
-                    <TableCell>{row['timeframe']}</TableCell>
-                    <TableCell>
-                      <PerformedTests rowElement={row['optimizations']} />
-                    </TableCell>
-                    <TableCell>
-                      <IconButton onClick={() => handleComparePage(row['tid'])}>
-                        <ViewListIcon />
-                      </IconButton>
-                      <IconButton onClick={() => handleDeleteOptResult(row['tid'])}>
-                        <DeleteIcon />
-                      </IconButton>
-                    </TableCell>
+          {results.length === 0 ? (
+            <EmptyState
+              icon={ScienceIcon}
+              title="No Tests Yet"
+              description="Run your first optimization test to see results here. Configure a strategy and backtest parameters to get started."
+              actionLabel="Run Test"
+              onAction={handleRunTest}
+            />
+          ) : (
+            <TableContainer>
+              <Table aria-label="Results Table" size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Creation Time</TableCell>
+                    <TableCell>Strategy</TableCell>
+                    <TableCell>Provider</TableCell>
+                    <TableCell>Symbol</TableCell>
+                    <TableCell>Timeframe</TableCell>
+                    <TableCell>Tests</TableCell>
+                    <TableCell />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                </TableHead>
+                <TableBody>
+                  {results.map((row) => (
+                    <TableRow key={row['tid']} hover>
+                      <TableCell>{row['test_name']}</TableCell>
+                      <TableCell>{new Date(row['creation_time']).toLocaleString()}</TableCell>
+                      <TableCell>{row['strategy']}</TableCell>
+                      <TableCell>{row['provider']}</TableCell>
+                      <TableCell>{row['symbol']}</TableCell>
+                      <TableCell>{row['timeframe']}</TableCell>
+                      <TableCell>
+                        <PerformedTests rowElement={row['optimizations']} />
+                      </TableCell>
+                      <TableCell>
+                        <IconButton onClick={() => handleComparePage(row['tid'])}>
+                          <ViewListIcon />
+                        </IconButton>
+                        <IconButton onClick={() => handleDeleteOptResult(row['tid'])}>
+                          <DeleteIcon />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
         </Paper>
       </Grid>
     </Grid>
