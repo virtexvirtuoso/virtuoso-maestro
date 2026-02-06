@@ -8,6 +8,7 @@ import ListItemText from '@mui/material/ListItemText';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 
 export default function MainListItems() {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ export default function MainListItems() {
     { path: '/', label: 'Home', icon: <DashboardIcon /> },
     { path: '/results', label: 'Results', icon: <AssessmentIcon /> },
     { path: '/evaluate', label: 'Evaluation', icon: <TrendingUpIcon /> },
+    { path: '/compare', label: 'Compare', icon: <CompareArrowsIcon /> },
   ];
 
   return (

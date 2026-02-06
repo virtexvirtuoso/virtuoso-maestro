@@ -18,6 +18,7 @@ import OptimizationResults from './OptimizationResults';
 import Home from './Home';
 import MainListItems from './ListItems';
 import Evaluation from './Evaluation';
+import StrategyComparison from './StrategyComparison';
 import ErrorBoundary from './ErrorBoundary';
 
 function Copyright() {
@@ -166,6 +167,7 @@ export default function Dashboard() {
               <Route path="/results" element={<OptimizationResults />} />
               <Route path="/evaluate" element={<Evaluation />} />
               <Route path="/evaluate/:tid" element={<Evaluation />} />
+              <Route path="/compare" element={<StrategyComparison />} />
             </Routes>
           </ErrorBoundary>
           <Box pt={4}>
