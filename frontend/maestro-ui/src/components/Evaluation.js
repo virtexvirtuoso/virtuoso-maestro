@@ -29,6 +29,7 @@ import WalkForwardMetrics from './WalkForwardMetrics';
 import HeatMapChart from './HeatMap';
 import WalkForwardTimeline from './WalkForwardTimeline';
 import ParameterStabilityChart from './ParameterStabilityChart';
+import OptunaVisualization from './OptunaVisualization';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
@@ -450,6 +451,33 @@ export default function Evaluation() {
     return <HeatMapChart tid={results['tid']} />;
   };
 
+  const getOptunaVisualization = () => {
+    if (Object.keys(results).length === 0) {
+      return <NoDataMsg />;
+    }
+
+    // Check if this is a V2 optimization result with Optuna study data
+    const optunaStudy = results['optuna_study'] || results['study'];
+    const optunaTrials = results['optuna_trials'] || results['trials'];
+
+    if (!optunaStudy && !optunaTrials) {
+      return (
+        <p>
+          No Optuna optimization data available. This section shows results from Optuna-based
+          hyperparameter optimization studies (V2 API).
+        </p>
+      );
+    }
+
+    // Build study data object for OptunaVisualization
+    const studyData = {
+      study_name: optunaStudy?.name || results['test_name'],
+      trials: optunaTrials || [],
+    };
+
+    return <OptunaVisualization studyData={studyData} />;
+  };
+
   const getWalkForwardTimeline = () => {
     if (Object.keys(results).length === 0) {
       return <NoDataMsg />;
@@ -643,6 +671,12 @@ export default function Evaluation() {
         <Paper sx={paperSx}>
           <Title>Heatmap Chart</Title>
           {getHeatMapChart()}
+        </Paper>
+      </Grid>
+      <Grid item xs={12}>
+        <Paper sx={paperSx}>
+          <Title>Optuna Optimization</Title>
+          {getOptunaVisualization()}
         </Paper>
       </Grid>
     </Grid>
