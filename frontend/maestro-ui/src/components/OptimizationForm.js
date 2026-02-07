@@ -18,12 +18,13 @@ import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Radio from '@mui/material/Radio';
 import Skeleton from '@mui/material/Skeleton';
-import FormHelperText from '@mui/material/FormHelperText';
+import Typography from '@mui/material/Typography';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useOptimizationProgress } from '../hooks/useOptimizationProgress';
 import { useNotification } from '../context/NotificationContext';
+import SymbolChipSelector from './SymbolChipSelector';
 
 const formControlSx = { m: 0.5, minWidth: 120 };
 
@@ -233,32 +234,23 @@ export default function OptimizationForm({
             </>
           )}
         </FormControl>
-        <FormControl sx={formControlSx}>
-          {loadingSymbols ? (
-            <Skeleton variant="rectangular" height={56} />
-          ) : (
-            <>
-              <InputLabel id="symbol-select-label">Symbol</InputLabel>
-              <Select
-                labelId="symbol-select-label"
-                id="symbol-select"
-                value={symbol}
-                label="Symbol"
-                disabled={!provider || loadingSymbols}
-                onChange={(e) => onSymbolChange(e.target.value)}
-              >
-                {symbols.map((p) => (
-                  <MenuItem key={p} value={p}>
-                    {p}
-                  </MenuItem>
-                ))}
-              </Select>
-              {!provider && (
-                <FormHelperText>Select a provider first</FormHelperText>
-              )}
-            </>
-          )}
-        </FormControl>
+        <Box sx={{ m: 0.5, minWidth: 200 }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 1, fontWeight: 500 }}
+          >
+            Symbol
+          </Typography>
+          <SymbolChipSelector
+            provider={provider}
+            value={symbol}
+            onChange={onSymbolChange}
+            disabled={!provider}
+            symbols={symbols}
+            loading={loadingSymbols}
+          />
+        </Box>
         <FormControl sx={formControlSx}>
           <InputLabel id="binsize-select-label">Time Frame</InputLabel>
           <Select
