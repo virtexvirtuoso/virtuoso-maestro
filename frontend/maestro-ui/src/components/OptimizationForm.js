@@ -27,13 +27,19 @@ import { useNotification } from '../context/NotificationContext';
 
 const formControlSx = { m: 0.5, minWidth: 120 };
 
-export default function OptimizationForm() {
+export default function OptimizationForm({
+  provider,
+  symbol,
+  binSize,
+  providers,
+  symbols,
+  loadingProviders,
+  loadingSymbols,
+  onProviderChange,
+  onSymbolChange,
+  onBinSizeChange,
+}) {
   const [testName, setTestName] = useState('Test Name');
-  const [provider, setProvider] = useState('');
-  const [providers, setProviders] = useState([]);
-  const [symbol, setSymbol] = useState('');
-  const [symbols, setSymbols] = useState([]);
-  const [binSize, setBinSize] = useState('1d');
   const [strategy, setStrategy] = useState('');
   const [strategies, setStrategies] = useState([]);
   const [optType, setOptType] = useState('BACKTESTING');
@@ -47,8 +53,6 @@ export default function OptimizationForm() {
   const [paramValues, setParamValues] = useState({});
   const [startDate, setStartDate] = useState(new Date(2000, 1, 1));
   const [endDate, setEndDate] = useState(new Date());
-  const [loadingProviders, setLoadingProviders] = useState(true);
-  const [loadingSymbols, setLoadingSymbols] = useState(false);
   const [loadingStrategies, setLoadingStrategies] = useState(true);
 
   // Centralized notification system
@@ -71,22 +75,6 @@ export default function OptimizationForm() {
       .catch((e) => notify(`Failed to load strategy params: ${e}`, 'error'));
   }, [notify]);
 
-  const updateSymbolsAvailable = useCallback((providerName) => {
-    if (!providerName) return;
-    setLoadingSymbols(true);
-    fetch(`${process.env.REACT_APP_REST_API_URL}/datasource/${providerName}/symbols`)
-      .then((response) => response.json())
-      .then((data) => {
-        setSymbols(data);
-        setSymbol(data.length > 0 ? data[0] : '');
-        setLoadingSymbols(false);
-      })
-      .catch((e) => {
-        notify(`Failed to load symbols: ${e}`, 'error');
-        setLoadingSymbols(false);
-      });
-  }, [notify]);
-
   useEffect(() => {
     setLoadingStrategies(true);
     fetch(`${process.env.REACT_APP_REST_API_URL}/strategy/available`)
@@ -103,23 +91,7 @@ export default function OptimizationForm() {
         notify(`Failed to load strategies: ${e}`, 'error');
         setLoadingStrategies(false);
       });
-
-    setLoadingProviders(true);
-    fetch(`${process.env.REACT_APP_REST_API_URL}/datasource/available`)
-      .then((response) => response.json())
-      .then((data) => {
-        setProviders(data);
-        if (data.length > 0) {
-          setProvider(data[0]);
-          updateSymbolsAvailable(data[0]);
-        }
-        setLoadingProviders(false);
-      })
-      .catch((e) => {
-        notify(`Failed to load data sources: ${e}`, 'error');
-        setLoadingProviders(false);
-      });
-  }, [updateStrategyParams, updateSymbolsAvailable, notify]);
+  }, [updateStrategyParams, notify]);
 
   // Handle optimization completion
   useEffect(() => {
@@ -134,10 +106,7 @@ export default function OptimizationForm() {
   }, [isComplete, isRunning, progressError, status, notify]);
 
   const handleProviderChange = (e) => {
-    const value = e.target.value;
-    setProvider(value);
-    setSymbol('');
-    updateSymbolsAvailable(value);
+    onProviderChange(e.target.value);
   };
 
   const handleStrategyChange = (e) => {
@@ -276,7 +245,7 @@ export default function OptimizationForm() {
                 value={symbol}
                 label="Symbol"
                 disabled={!provider || loadingSymbols}
-                onChange={(e) => setSymbol(e.target.value)}
+                onChange={(e) => onSymbolChange(e.target.value)}
               >
                 {symbols.map((p) => (
                   <MenuItem key={p} value={p}>
@@ -297,7 +266,7 @@ export default function OptimizationForm() {
             id="binsize-select"
             value={binSize}
             label="Time Frame"
-            onChange={(e) => setBinSize(e.target.value)}
+            onChange={(e) => onBinSizeChange(e.target.value)}
           >
             <MenuItem key="1d" value="1d">
               1 Day
