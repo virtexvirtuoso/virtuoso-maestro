@@ -15,6 +15,7 @@ import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Radio from '@mui/material/Radio';
 import Skeleton from '@mui/material/Skeleton';
+import FormHelperText from '@mui/material/FormHelperText';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -132,6 +133,7 @@ export default function OptimizationForm() {
   const handleProviderChange = (e) => {
     const value = e.target.value;
     setProvider(value);
+    setSymbol('');
     updateSymbolsAvailable(value);
   };
 
@@ -270,6 +272,7 @@ export default function OptimizationForm() {
                 id="symbol-select"
                 value={symbol}
                 label="Symbol"
+                disabled={!provider || loadingSymbols}
                 onChange={(e) => setSymbol(e.target.value)}
               >
                 {symbols.map((p) => (
@@ -278,6 +281,9 @@ export default function OptimizationForm() {
                   </MenuItem>
                 ))}
               </Select>
+              {!provider && (
+                <FormHelperText>Select a provider first</FormHelperText>
+              )}
             </>
           )}
         </FormControl>
