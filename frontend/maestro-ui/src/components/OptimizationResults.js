@@ -337,7 +337,7 @@ export default function OptimizationResults() {
                         <TableCell>{row['provider']}</TableCell>
                         <TableCell>{row['symbol']}</TableCell>
                         <TableCell>{row['timeframe']}</TableCell>
-                        <TableCell sx={{ fontFamily: 'monospace' }}>
+                        <TableCell sx={{ fontFamily: '"IBM Plex Mono", monospace' }}>
                           {formatSharpe(row['sharpe'])}
                         </TableCell>
                         <TableCell>

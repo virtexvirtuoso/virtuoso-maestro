@@ -36,11 +36,11 @@ const OPTIMIZATION_TYPES = [
   },
 ];
 
-// Gold theme for selected state
+// Gold theme for selected state (uses Maestro palette)
 const SELECTED_COLORS = {
-  border: '#D4AF37',      // Gold border
-  background: 'rgba(212, 175, 55, 0.08)',  // Light gold tint
-  iconColor: '#D4AF37',   // Gold icon
+  border: '#fbbf24',      // primary.main (amber gold)
+  background: 'rgba(251, 191, 36, 0.08)',  // Light gold tint
+  iconColor: '#fbbf24',   // primary.main
 };
 
 export default function OptimizationTypeSelector({

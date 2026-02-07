@@ -32,7 +32,7 @@ const theme = createTheme({
       dark: '#059669',
     },
     background: {
-      default: '#000000',
+      default: '#0a0a0a',
       paper: '#111111',
     },
     text: {
@@ -300,6 +300,36 @@ const theme = createTheme({
         standardInfo: {
           backgroundColor: 'rgba(6, 182, 212, 0.1)',
           border: '1px solid #06B6D4',
+        },
+      },
+    },
+    MuiToggleButtonGroup: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#111111',
+          border: '1px solid #222222',
+          borderRadius: '8px',
+        },
+      },
+    },
+    MuiToggleButton: {
+      styleOverrides: {
+        root: {
+          fontFamily: '"IBM Plex Mono", monospace',
+          fontWeight: 500,
+          textTransform: 'none',
+          border: 'none',
+          '&.Mui-selected': {
+            backgroundColor: '#fbbf24',
+            color: '#000000',
+            boxShadow: '0 0 15px rgba(251, 191, 36, 0.3)',
+            '&:hover': {
+              backgroundColor: '#f59e0b',
+            },
+          },
+          '&:hover': {
+            backgroundColor: 'rgba(251, 191, 36, 0.1)',
+          },
         },
       },
     },
