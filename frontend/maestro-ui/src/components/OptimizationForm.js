@@ -13,10 +13,6 @@ import OptimizationProgress from './OptimizationProgress';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import Tooltip from '@mui/material/Tooltip';
-import FormLabel from '@mui/material/FormLabel';
-import RadioGroup from '@mui/material/RadioGroup';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Radio from '@mui/material/Radio';
 import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
@@ -27,6 +23,7 @@ import { useNotification } from '../context/NotificationContext';
 import SymbolChipSelector from './SymbolChipSelector';
 import StrategyParamEditor from './StrategyParamEditor';
 import TimeframeSelector from './TimeframeSelector';
+import OptimizationTypeSelector from './OptimizationTypeSelector';
 
 const formControlSx = { m: 0.5, minWidth: 120 };
 
@@ -325,19 +322,19 @@ export default function OptimizationForm({
             />
           </Box>
         )}
-        <FormControl sx={formControlSx}>
-          <FormLabel>Optimization Type</FormLabel>
-          <RadioGroup
-            id="optType"
-            name="optType"
-            value={optType}
-            onChange={(e) => setOptType(e.target.value)}
+        <Box sx={{ m: 0.5, minWidth: 300 }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 1, fontWeight: 500 }}
           >
-            <FormControlLabel value="BACKTESTING" control={<Radio />} label="Backtesting" />
-            <FormControlLabel value="WALKFORWARD" control={<Radio />} label="Walk Forward" />
-            <FormControlLabel value="BOTH" control={<Radio />} label="Backtesting + Walk Forward" />
-          </RadioGroup>
-        </FormControl>
+            Optimization Type
+          </Typography>
+          <OptimizationTypeSelector
+            value={optType}
+            onChange={setOptType}
+          />
+        </Box>
         <Grid container direction="row" justifyContent="flex-end" alignItems="center">
           <Box sx={{ m: 0.5 }}>
             <Button

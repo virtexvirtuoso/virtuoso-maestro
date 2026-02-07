@@ -41,6 +41,7 @@ import { useNotification } from '../context/NotificationContext';
 import StrategyCategorySelector from './StrategyCategorySelector';
 import StrategyParamEditor from './StrategyParamEditor';
 import TimeframeSelector from './TimeframeSelector';
+import OptimizationTypeSelector from './OptimizationTypeSelector';
 
 // Step labels
 const STEPS = ['Data Source', 'Strategy', 'Settings', 'Review'];
@@ -66,24 +67,12 @@ const TIMEFRAMES = [
 ];
 
 
-// Optimization type options
-const OPTIMIZATION_TYPES = [
-  {
-    value: 'BACKTESTING',
-    label: 'Backtesting',
-    description: 'Single-pass historical simulation',
-  },
-  {
-    value: 'WALKFORWARD',
-    label: 'Walk Forward',
-    description: 'Rolling validation to prevent overfitting',
-  },
-  {
-    value: 'BOTH',
-    label: 'Both',
-    description: 'Run backtesting + walk-forward analysis',
-  },
-];
+// Optimization type labels for review display
+const OPTIMIZATION_TYPE_LABELS = {
+  BACKTESTING: 'Backtest',
+  WALKFORWARD: 'Walk-Forward',
+  BOTH: 'Both',
+};
 
 export default function OptimizationWizard({ open, onClose }) {
   const { notify } = useNotification();
@@ -489,38 +478,12 @@ export default function OptimizationWizard({ open, onClose }) {
       <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
         Optimization Type
       </Typography>
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        {OPTIMIZATION_TYPES.map((opt) => {
-          const isSelected = formData.optType === opt.value;
-          return (
-            <Grid item xs={12} sm={4} key={opt.value}>
-              <Card
-                sx={{
-                  bgcolor: isSelected ? 'action.selected' : 'background.paper',
-                  border: isSelected ? '2px solid' : '1px solid',
-                  borderColor: isSelected ? 'primary.main' : 'divider',
-                  '&:hover': { boxShadow: 2 },
-                  transition: 'all 0.2s',
-                }}
-              >
-                <CardActionArea onClick={() => updateFormData('optType', opt.value)}>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                      {isSelected && <CheckCircleIcon color="primary" fontSize="small" />}
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                        {opt.label}
-                      </Typography>
-                    </Box>
-                    <Typography variant="body2" color="text.secondary">
-                      {opt.description}
-                    </Typography>
-                  </CardContent>
-                </CardActionArea>
-              </Card>
-            </Grid>
-          );
-        })}
-      </Grid>
+      <Box sx={{ mb: 3 }}>
+        <OptimizationTypeSelector
+          value={formData.optType}
+          onChange={(value) => updateFormData('optType', value)}
+        />
+      </Box>
 
       {/* Cash & Commission */}
       <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
@@ -621,7 +584,7 @@ export default function OptimizationWizard({ open, onClose }) {
             <TableRow>
               <TableCell sx={{ fontWeight: 600 }}>Optimization Type</TableCell>
               <TableCell>
-                {OPTIMIZATION_TYPES.find((o) => o.value === formData.optType)?.label}
+                {OPTIMIZATION_TYPE_LABELS[formData.optType]}
               </TableCell>
             </TableRow>
             <TableRow>
