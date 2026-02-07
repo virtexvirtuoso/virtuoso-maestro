@@ -26,6 +26,7 @@ import { useOptimizationProgress } from '../hooks/useOptimizationProgress';
 import { useNotification } from '../context/NotificationContext';
 import SymbolChipSelector from './SymbolChipSelector';
 import StrategyParamEditor from './StrategyParamEditor';
+import TimeframeSelector from './TimeframeSelector';
 
 const formControlSx = { m: 0.5, minWidth: 120 };
 
@@ -246,29 +247,20 @@ export default function OptimizationForm({
             loading={loadingSymbols}
           />
         </Box>
-        <FormControl sx={formControlSx}>
-          <InputLabel id="binsize-select-label">Time Frame</InputLabel>
-          <Select
-            labelId="binsize-select-label"
-            id="binsize-select"
-            value={binSize}
-            label="Time Frame"
-            onChange={(e) => onBinSizeChange(e.target.value)}
+        <Box sx={{ m: 0.5, minWidth: 200 }}>
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mb: 1, fontWeight: 500 }}
           >
-            <MenuItem key="1d" value="1d">
-              1 Day
-            </MenuItem>
-            <MenuItem key="1h" value="1h">
-              1 Hour
-            </MenuItem>
-            <MenuItem key="5m" value="5m">
-              5 Minutes
-            </MenuItem>
-            <MenuItem key="1m" value="1m">
-              1 Minutes
-            </MenuItem>
-          </Select>
-        </FormControl>
+            Timeframe
+          </Typography>
+          <TimeframeSelector
+            value={binSize}
+            onChange={onBinSizeChange}
+            disabled={!provider || !symbol}
+          />
+        </Box>
         <FormControl sx={formControlSx}>
           <TextField
             id="cash-text"

@@ -40,6 +40,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useNotification } from '../context/NotificationContext';
 import StrategyCategorySelector from './StrategyCategorySelector';
 import StrategyParamEditor from './StrategyParamEditor';
+import TimeframeSelector from './TimeframeSelector';
 
 // Step labels
 const STEPS = ['Data Source', 'Strategy', 'Settings', 'Review'];
@@ -54,11 +55,13 @@ const PROVIDER_CONFIG = {
   gate: { name: 'Gate.io', color: '#17E6A1', description: 'Spot and margin' },
 };
 
-// Timeframe options
+// Timeframe options (used for display in Review step)
 const TIMEFRAMES = [
   { value: '1m', label: '1 Min' },
   { value: '5m', label: '5 Min' },
+  { value: '15m', label: '15 Min' },
   { value: '1h', label: '1 Hour' },
+  { value: '4h', label: '4 Hour' },
   { value: '1d', label: '1 Day' },
 ];
 
@@ -411,17 +414,12 @@ export default function OptimizationWizard({ open, onClose }) {
         <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
           Timeframe
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1, mb: 3 }}>
-          {TIMEFRAMES.map((tf) => (
-            <Button
-              key={tf.value}
-              variant={formData.binSize === tf.value ? 'contained' : 'outlined'}
-              onClick={() => updateFormData('binSize', tf.value)}
-              sx={{ minWidth: 80 }}
-            >
-              {tf.label}
-            </Button>
-          ))}
+        <Box sx={{ mb: 3 }}>
+          <TimeframeSelector
+            value={formData.binSize}
+            onChange={(value) => updateFormData('binSize', value)}
+            disabled={!formData.provider || !formData.symbol}
+          />
         </Box>
 
         {/* Date Range */}
