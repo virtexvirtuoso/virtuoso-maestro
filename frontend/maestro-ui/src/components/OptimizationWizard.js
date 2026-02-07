@@ -42,6 +42,7 @@ import StrategyCategorySelector from './StrategyCategorySelector';
 import StrategyParamEditor from './StrategyParamEditor';
 import TimeframeSelector from './TimeframeSelector';
 import OptimizationTypeSelector from './OptimizationTypeSelector';
+import WalkForwardSettings from './WalkForwardSettings';
 
 // Step labels
 const STEPS = ['Data Source', 'Strategy', 'Settings', 'Review'];
@@ -97,6 +98,7 @@ export default function OptimizationWizard({ open, onClose }) {
     cash: 10000,
     commissions: 0.1,
     wfoSplits: 10,
+    wfoMode: 'rolling',
     // Step 4: Review
     testName: '',
   });
@@ -252,6 +254,7 @@ export default function OptimizationWizard({ open, onClose }) {
       end_date: formData.endDate.getTime(),
       strategy_params: formData.strategyParams,
       wfo_splits: formData.wfoSplits,
+      wfo_mode: formData.wfoMode,
     };
 
     try {
@@ -294,6 +297,7 @@ export default function OptimizationWizard({ open, onClose }) {
       cash: 10000,
       commissions: 0.1,
       wfoSplits: 10,
+      wfoMode: 'rolling',
       testName: '',
     });
     setSymbols([]);
@@ -520,27 +524,14 @@ export default function OptimizationWizard({ open, onClose }) {
         </Grid>
       </Grid>
 
-      {/* Walk-Forward Settings */}
-      {(formData.optType === 'WALKFORWARD' || formData.optType === 'BOTH') && (
-        <>
-          <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
-            Walk-Forward Settings
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Number of Splits"
-                type="number"
-                value={formData.wfoSplits}
-                onChange={(e) => updateFormData('wfoSplits', Number(e.target.value))}
-                helperText="Rolling time-series validation windows (default: 10)"
-                inputProps={{ min: 2, max: 50 }}
-              />
-            </Grid>
-          </Grid>
-        </>
-      )}
+      {/* Walk-Forward Settings - Collapsible panel */}
+      <WalkForwardSettings
+        optType={formData.optType}
+        numSplits={formData.wfoSplits}
+        mode={formData.wfoMode}
+        onNumSplitsChange={(value) => updateFormData('wfoSplits', value)}
+        onModeChange={(value) => updateFormData('wfoMode', value)}
+      />
     </Box>
   );
 
@@ -596,10 +587,16 @@ export default function OptimizationWizard({ open, onClose }) {
               <TableCell>{formData.commissions}%</TableCell>
             </TableRow>
             {(formData.optType === 'WALKFORWARD' || formData.optType === 'BOTH') && (
-              <TableRow>
-                <TableCell sx={{ fontWeight: 600 }}>WFO Splits</TableCell>
-                <TableCell>{formData.wfoSplits}</TableCell>
-              </TableRow>
+              <>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600 }}>WFO Splits</TableCell>
+                  <TableCell>{formData.wfoSplits}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 600 }}>WFO Mode</TableCell>
+                  <TableCell sx={{ textTransform: 'capitalize' }}>{formData.wfoMode}</TableCell>
+                </TableRow>
+              </>
             )}
             {Object.keys(formData.strategyParams).length > 0 && (
               <TableRow>

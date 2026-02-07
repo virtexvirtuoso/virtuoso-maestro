@@ -24,6 +24,7 @@ import SymbolChipSelector from './SymbolChipSelector';
 import StrategyParamEditor from './StrategyParamEditor';
 import TimeframeSelector from './TimeframeSelector';
 import OptimizationTypeSelector from './OptimizationTypeSelector';
+import WalkForwardSettings from './WalkForwardSettings';
 
 const formControlSx = { m: 0.5, minWidth: 120 };
 
@@ -53,6 +54,8 @@ export default function OptimizationForm({
   const [startDate, setStartDate] = useState(new Date(2000, 1, 1));
   const [endDate, setEndDate] = useState(new Date());
   const [loadingStrategies, setLoadingStrategies] = useState(true);
+  const [wfoSplits, setWfoSplits] = useState(10);
+  const [wfoMode, setWfoMode] = useState('rolling');
 
   // Centralized notification system
   const { notify } = useNotification();
@@ -133,6 +136,8 @@ export default function OptimizationForm({
       start_date: startDate.getTime(),
       end_date: endDate.getTime(),
       strategy_params: { ...paramValues },
+      wfo_splits: wfoSplits,
+      wfo_mode: wfoMode,
     };
 
     const requestOptions = {
@@ -333,6 +338,15 @@ export default function OptimizationForm({
           <OptimizationTypeSelector
             value={optType}
             onChange={setOptType}
+          />
+        </Box>
+        <Box sx={{ m: 0.5, minWidth: 300 }}>
+          <WalkForwardSettings
+            optType={optType}
+            numSplits={wfoSplits}
+            mode={wfoMode}
+            onNumSplitsChange={setWfoSplits}
+            onModeChange={setWfoMode}
           />
         </Box>
         <Grid container direction="row" justifyContent="flex-end" alignItems="center">
