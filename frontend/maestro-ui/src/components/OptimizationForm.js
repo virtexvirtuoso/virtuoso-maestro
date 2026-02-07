@@ -14,6 +14,7 @@ import FormLabel from '@mui/material/FormLabel';
 import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Radio from '@mui/material/Radio';
+import Skeleton from '@mui/material/Skeleton';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -42,6 +43,9 @@ export default function OptimizationForm() {
   const [paramValues, setParamValues] = useState({});
   const [startDate, setStartDate] = useState(new Date(2000, 1, 1));
   const [endDate, setEndDate] = useState(new Date());
+  const [loadingProviders, setLoadingProviders] = useState(true);
+  const [loadingSymbols, setLoadingSymbols] = useState(false);
+  const [loadingStrategies, setLoadingStrategies] = useState(true);
 
   // Centralized notification system
   const { notify } = useNotification();
@@ -65,16 +69,22 @@ export default function OptimizationForm() {
 
   const updateSymbolsAvailable = useCallback((providerName) => {
     if (!providerName) return;
+    setLoadingSymbols(true);
     fetch(`${process.env.REACT_APP_REST_API_URL}/datasource/${providerName}/symbols`)
       .then((response) => response.json())
       .then((data) => {
         setSymbols(data);
         setSymbol(data.length > 0 ? data[0] : '');
+        setLoadingSymbols(false);
       })
-      .catch((e) => notify(`Failed to load symbols: ${e}`, 'error'));
+      .catch((e) => {
+        notify(`Failed to load symbols: ${e}`, 'error');
+        setLoadingSymbols(false);
+      });
   }, [notify]);
 
   useEffect(() => {
+    setLoadingStrategies(true);
     fetch(`${process.env.REACT_APP_REST_API_URL}/strategy/available`)
       .then((response) => response.json())
       .then((data) => {
@@ -83,9 +93,14 @@ export default function OptimizationForm() {
           setStrategy(data[0]);
           updateStrategyParams(data[0]);
         }
+        setLoadingStrategies(false);
       })
-      .catch((e) => notify(`Failed to load strategies: ${e}`, 'error'));
+      .catch((e) => {
+        notify(`Failed to load strategies: ${e}`, 'error');
+        setLoadingStrategies(false);
+      });
 
+    setLoadingProviders(true);
     fetch(`${process.env.REACT_APP_REST_API_URL}/datasource/available`)
       .then((response) => response.json())
       .then((data) => {
@@ -94,8 +109,12 @@ export default function OptimizationForm() {
           setProvider(data[0]);
           updateSymbolsAvailable(data[0]);
         }
+        setLoadingProviders(false);
       })
-      .catch((e) => notify(`Failed to load data sources: ${e}`, 'error'));
+      .catch((e) => {
+        notify(`Failed to load data sources: ${e}`, 'error');
+        setLoadingProviders(false);
+      });
   }, [updateStrategyParams, updateSymbolsAvailable, notify]);
 
   // Handle optimization completion
@@ -219,36 +238,48 @@ export default function OptimizationForm() {
           />
         </FormControl>
         <FormControl sx={formControlSx}>
-          <InputLabel id="provider-select-label">Provider</InputLabel>
-          <Select
-            labelId="provider-select-label"
-            id="provider-select"
-            value={provider}
-            label="Provider"
-            onChange={handleProviderChange}
-          >
-            {providers.map((p) => (
-              <MenuItem key={p} value={p}>
-                {p}
-              </MenuItem>
-            ))}
-          </Select>
+          {loadingProviders ? (
+            <Skeleton variant="rectangular" height={56} />
+          ) : (
+            <>
+              <InputLabel id="provider-select-label">Provider</InputLabel>
+              <Select
+                labelId="provider-select-label"
+                id="provider-select"
+                value={provider}
+                label="Provider"
+                onChange={handleProviderChange}
+              >
+                {providers.map((p) => (
+                  <MenuItem key={p} value={p}>
+                    {p}
+                  </MenuItem>
+                ))}
+              </Select>
+            </>
+          )}
         </FormControl>
         <FormControl sx={formControlSx}>
-          <InputLabel id="symbol-select-label">Symbol</InputLabel>
-          <Select
-            labelId="symbol-select-label"
-            id="symbol-select"
-            value={symbol}
-            label="Symbol"
-            onChange={(e) => setSymbol(e.target.value)}
-          >
-            {symbols.map((p) => (
-              <MenuItem key={p} value={p}>
-                {p}
-              </MenuItem>
-            ))}
-          </Select>
+          {loadingSymbols ? (
+            <Skeleton variant="rectangular" height={56} />
+          ) : (
+            <>
+              <InputLabel id="symbol-select-label">Symbol</InputLabel>
+              <Select
+                labelId="symbol-select-label"
+                id="symbol-select"
+                value={symbol}
+                label="Symbol"
+                onChange={(e) => setSymbol(e.target.value)}
+              >
+                {symbols.map((p) => (
+                  <MenuItem key={p} value={p}>
+                    {p}
+                  </MenuItem>
+                ))}
+              </Select>
+            </>
+          )}
         </FormControl>
         <FormControl sx={formControlSx}>
           <InputLabel id="binsize-select-label">Time Frame</InputLabel>
@@ -292,20 +323,26 @@ export default function OptimizationForm() {
           />
         </FormControl>
         <FormControl sx={formControlSx}>
-          <InputLabel id="strategy-select-label">Strategy</InputLabel>
-          <Select
-            labelId="strategy-select-label"
-            id="strategy-select"
-            value={strategy}
-            label="Strategy"
-            onChange={handleStrategyChange}
-          >
-            {strategies.map((row) => (
-              <MenuItem key={row} value={row}>
-                {row}
-              </MenuItem>
-            ))}
-          </Select>
+          {loadingStrategies ? (
+            <Skeleton variant="rectangular" height={56} />
+          ) : (
+            <>
+              <InputLabel id="strategy-select-label">Strategy</InputLabel>
+              <Select
+                labelId="strategy-select-label"
+                id="strategy-select"
+                value={strategy}
+                label="Strategy"
+                onChange={handleStrategyChange}
+              >
+                {strategies.map((row) => (
+                  <MenuItem key={row} value={row}>
+                    {row}
+                  </MenuItem>
+                ))}
+              </Select>
+            </>
+          )}
         </FormControl>
         <FormControl sx={formControlSx}>
           {strategiesParameters.map((row) => (
