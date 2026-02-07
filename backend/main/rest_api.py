@@ -45,6 +45,14 @@ class StrategyParams(Resource):
         return __STRATEGY_CATALOG__.get(strategy).get_params()
 
 
+class StrategyParamsMetadata(Resource):
+    """Get detailed parameter metadata including descriptions, min/max, step."""
+
+    def get(self, strategy: str):
+        from strategies import get_param_metadata
+        return get_param_metadata(strategy)
+
+
 class DataSourceProvider(Resource):
 
     def get(self):
@@ -667,6 +675,7 @@ if __name__ == '__main__':
 
     api.add_resource(StrategyList, '/strategy/available')
     api.add_resource(StrategyParams, '/strategy/<string:strategy>/params')
+    api.add_resource(StrategyParamsMetadata, '/strategy/<string:strategy>/params/metadata')
     api.add_resource(Optimization, '/optimization/new/',
                      resource_class_kwargs={'rethinkdb_config': rethinkdb_config,
                                             'optimization_output': config_reader.get_optimization_output_config(),

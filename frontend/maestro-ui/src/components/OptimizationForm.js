@@ -25,6 +25,7 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useOptimizationProgress } from '../hooks/useOptimizationProgress';
 import { useNotification } from '../context/NotificationContext';
 import SymbolChipSelector from './SymbolChipSelector';
+import StrategyParamEditor from './StrategyParamEditor';
 
 const formControlSx = { m: 0.5, minWidth: 120 };
 
@@ -50,7 +51,6 @@ export default function OptimizationForm({
   const [testNameHelperText, setTestNameHelperText] = useState('');
   const [cash, setCash] = useState(10000);
   const [commissions, setCommissions] = useState(0.01);
-  const [strategiesParameters, setStrategiesParameters] = useState([]);
   const [paramValues, setParamValues] = useState({});
   const [startDate, setStartDate] = useState(new Date(2000, 1, 1));
   const [endDate, setEndDate] = useState(new Date());
@@ -70,7 +70,6 @@ export default function OptimizationForm({
     fetch(`${process.env.REACT_APP_REST_API_URL}/strategy/${strategyName}/params`)
       .then((response) => response.json())
       .then((data) => {
-        setStrategiesParameters(Object.keys(data));
         setParamValues(data);
       })
       .catch((e) => notify(`Failed to load strategy params: ${e}`, 'error'));
@@ -135,12 +134,8 @@ export default function OptimizationForm({
       commissions: commissions,
       start_date: startDate.getTime(),
       end_date: endDate.getTime(),
-      strategy_params: {},
+      strategy_params: { ...paramValues },
     };
-
-    strategiesParameters.forEach((p) => {
-      params.strategy_params[p] = paramValues[p];
-    });
 
     const requestOptions = {
       method: 'POST',
@@ -324,19 +319,20 @@ export default function OptimizationForm({
             </>
           )}
         </FormControl>
-        <FormControl sx={formControlSx}>
-          {strategiesParameters.map((row) => (
-            <FormControl key={row + '-form-control'} sx={formControlSx}>
-              <TextField
-                id={row + '-text'}
-                label={row}
-                type="number"
-                value={paramValues[row] || ''}
-                onChange={(e) => handleParamChange(row, Number(e.target.value))}
-              />
-            </FormControl>
-          ))}
-        </FormControl>
+        {/* Strategy Parameters - Using enhanced StrategyParamEditor */}
+        {strategy && (
+          <Box sx={{ m: 0.5, minWidth: 300 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1, fontWeight: 500 }}>
+              Strategy Parameters
+            </Typography>
+            <StrategyParamEditor
+              strategy={strategy}
+              values={paramValues}
+              onChange={handleParamChange}
+              showSliders={true}
+            />
+          </Box>
+        )}
         <FormControl sx={formControlSx}>
           <FormLabel>Optimization Type</FormLabel>
           <RadioGroup

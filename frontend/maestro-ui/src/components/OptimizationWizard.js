@@ -39,6 +39,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useNotification } from '../context/NotificationContext';
 import StrategyCategorySelector from './StrategyCategorySelector';
+import StrategyParamEditor from './StrategyParamEditor';
 
 // Step labels
 const STEPS = ['Data Source', 'Strategy', 'Settings', 'Review'];
@@ -112,11 +113,9 @@ export default function OptimizationWizard({ open, onClose }) {
   const [providers, setProviders] = useState([]);
   const [symbols, setSymbols] = useState([]);
   const [strategies, setStrategies] = useState([]);
-  const [strategyParamDefs, setStrategyParamDefs] = useState([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [loadingSymbols, setLoadingSymbols] = useState(false);
   const [loadingStrategies, setLoadingStrategies] = useState(true);
-  const [loadingParams, setLoadingParams] = useState(false);
 
 
   // Fetch providers on mount
@@ -172,26 +171,21 @@ export default function OptimizationWizard({ open, onClose }) {
       });
   }, [notify]);
 
-  // Fetch strategy params when strategy changes
+  // Fetch strategy params when strategy changes (for initial values)
   const fetchStrategyParams = useCallback((strategy) => {
     if (!strategy) {
-      setStrategyParamDefs([]);
       return;
     }
-    setLoadingParams(true);
     fetch(`${process.env.REACT_APP_REST_API_URL}/strategy/${strategy}/params`)
       .then((res) => res.json())
       .then((data) => {
-        setStrategyParamDefs(Object.keys(data));
         setFormData((prev) => ({
           ...prev,
           strategyParams: data,
         }));
-        setLoadingParams(false);
       })
       .catch((e) => {
         notify(`Failed to load strategy params: ${e}`, 'error');
-        setLoadingParams(false);
       });
   }, [notify]);
 
@@ -311,7 +305,6 @@ export default function OptimizationWizard({ open, onClose }) {
       testName: '',
     });
     setSymbols([]);
-    setStrategyParamDefs([]);
     onClose();
   };
 
@@ -474,38 +467,18 @@ export default function OptimizationWizard({ open, onClose }) {
         strategies={strategies}
       />
 
-      {/* Strategy Parameters */}
+      {/* Strategy Parameters - Using enhanced StrategyParamEditor */}
       {formData.strategy && (
         <Box sx={{ mt: 3 }}>
           <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
             Strategy Parameters
           </Typography>
-          {loadingParams ? (
-            <Box>
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} height={56} sx={{ mb: 1 }} />
-              ))}
-            </Box>
-          ) : strategyParamDefs.length === 0 ? (
-            <Alert severity="info">
-              This strategy has no configurable parameters
-            </Alert>
-          ) : (
-            <Grid container spacing={2}>
-              {strategyParamDefs.map((param) => (
-                <Grid item xs={12} sm={6} md={4} key={param}>
-                  <TextField
-                    fullWidth
-                    label={param}
-                    type="number"
-                    value={formData.strategyParams[param] || ''}
-                    onChange={(e) => updateStrategyParam(param, Number(e.target.value))}
-                    helperText={`Default: ${formData.strategyParams[param]}`}
-                  />
-                </Grid>
-              ))}
-            </Grid>
-          )}
+          <StrategyParamEditor
+            strategy={formData.strategy}
+            values={formData.strategyParams}
+            onChange={(param, value) => updateStrategyParam(param, value)}
+            showSliders={true}
+          />
         </Box>
       )}
     </Box>
