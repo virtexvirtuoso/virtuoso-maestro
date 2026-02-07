@@ -14,18 +14,13 @@ import List from '@mui/material/List';
 import ListItem from '@mui/material/ListItem';
 import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
-import Dialog from '@mui/material/Dialog';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
-import IconButton from '@mui/material/IconButton';
 import AddIcon from '@mui/icons-material/Add';
-import CloseIcon from '@mui/icons-material/Close';
 import StorageIcon from '@mui/icons-material/Storage';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import HistoryIcon from '@mui/icons-material/History';
 import CandleStickChart from './CandleStickChart';
-import OptimizationForm from './OptimizationForm';
+import OptimizationWizard from './OptimizationWizard';
 import { useNotification } from '../context/NotificationContext';
 
 // Provider metadata with colors and descriptions
@@ -135,14 +130,11 @@ function ProviderCard({ provider, symbols, onClick }) {
 export default function Home() {
   const [provider, setProvider] = useState('');
   const [symbol, setSymbol] = useState('');
-  const [binSize, setBinSize] = useState('1d');
   const [providers, setProviders] = useState([]);
-  const [symbols, setSymbols] = useState([]);
   const [providerSymbols, setProviderSymbols] = useState({});
   const [strategies, setStrategies] = useState([]);
   const [recentOptimizations, setRecentOptimizations] = useState([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
-  const [loadingSymbols, setLoadingSymbols] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
 
   const { notify } = useNotification();
@@ -162,22 +154,19 @@ export default function Home() {
     setProviderSymbols(symbolMap);
   }, []);
 
-  const updateSymbolsAvailable = useCallback((providerName) => {
+  // Update symbol when provider changes (for chart preview)
+  const updateSymbolForChart = useCallback((providerName) => {
     if (!providerName) {
-      setSymbols([]);
+      setSymbol('');
       return;
     }
-    setLoadingSymbols(true);
     fetch(`${process.env.REACT_APP_REST_API_URL}/datasource/${providerName}/symbols`)
       .then((response) => response.json())
       .then((data) => {
-        setSymbols(data);
         setSymbol(data.length > 0 ? data[0] : '');
-        setLoadingSymbols(false);
       })
       .catch((e) => {
         notify(`Failed to load symbols: ${e}`, 'error');
-        setLoadingSymbols(false);
       });
   }, [notify]);
 
@@ -210,7 +199,7 @@ export default function Home() {
         fetchAllProviderSymbols(data);
         if (data.length > 0) {
           setProvider(data[0]);
-          updateSymbolsAvailable(data[0]);
+          updateSymbolForChart(data[0]);
         }
         setLoadingProviders(false);
       })
@@ -218,25 +207,13 @@ export default function Home() {
         notify(`Failed to load data sources: ${e}`, 'error');
         setLoadingProviders(false);
       });
-  }, [updateSymbolsAvailable, fetchAllProviderSymbols, notify]);
+  }, [updateSymbolForChart, fetchAllProviderSymbols, notify]);
 
-  const handleProviderChange = (newProvider) => {
-    setProvider(newProvider);
-    setSymbol('');
-    updateSymbolsAvailable(newProvider);
-  };
-
-  const handleSymbolChange = (newSymbol) => {
-    setSymbol(newSymbol);
-  };
-
-  const handleBinSizeChange = (newBinSize) => {
-    setBinSize(newBinSize);
-  };
-
+  // Handle provider card click - updates chart preview
   const handleProviderCardClick = (selectedProvider) => {
-    handleProviderChange(selectedProvider);
-    // Scroll to chart or open wizard
+    setProvider(selectedProvider);
+    setSymbol('');
+    updateSymbolForChart(selectedProvider);
   };
 
   const openOptimizationWizard = () => {
@@ -337,7 +314,7 @@ export default function Home() {
             <CandleStickChart
               provider={provider}
               symbol={symbol}
-              timeframe={binSize}
+              timeframe="1d"
             />
           </Paper>
 
@@ -419,39 +396,8 @@ export default function Home() {
         </Grid>
       </Grid>
 
-      {/* Optimization Wizard Dialog */}
-      <Dialog
-        open={wizardOpen}
-        onClose={closeOptimizationWizard}
-        maxWidth="md"
-        fullWidth
-        PaperProps={{
-          sx: { minHeight: '60vh' },
-        }}
-      >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            New Optimization
-          </Typography>
-          <IconButton onClick={closeOptimizationWizard} size="small">
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent dividers>
-          <OptimizationForm
-            provider={provider}
-            symbol={symbol}
-            binSize={binSize}
-            providers={providers}
-            symbols={symbols}
-            loadingProviders={loadingProviders}
-            loadingSymbols={loadingSymbols}
-            onProviderChange={handleProviderChange}
-            onSymbolChange={handleSymbolChange}
-            onBinSizeChange={handleBinSizeChange}
-          />
-        </DialogContent>
-      </Dialog>
+      {/* Optimization Wizard */}
+      <OptimizationWizard open={wizardOpen} onClose={closeOptimizationWizard} />
     </>
   );
 }
