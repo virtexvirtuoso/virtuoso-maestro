@@ -21,6 +21,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import HistoryIcon from '@mui/icons-material/History';
 import CandleStickChart from './CandleStickChart';
 import OptimizationWizard from './OptimizationWizard';
+import WelcomeEmptyState from './WelcomeEmptyState';
 import { useNotification } from '../context/NotificationContext';
 
 // Provider metadata with colors and descriptions
@@ -136,6 +137,7 @@ export default function Home() {
   const [recentOptimizations, setRecentOptimizations] = useState([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState(null); // null = loading, true/false = determined
 
   const { notify } = useNotification();
 
@@ -178,15 +180,21 @@ export default function Home() {
       .catch(() => setStrategies(Array(65).fill('strategy')));
   }, []);
 
-  // Fetch recent optimizations
+  // Fetch recent optimizations and determine if first-time user
   useEffect(() => {
     fetch(`${process.env.REACT_APP_REST_API_URL}/optimization/recent?limit=5`)
       .then((response) => {
         if (response.ok) return response.json();
         return [];
       })
-      .then((data) => setRecentOptimizations(data))
-      .catch(() => setRecentOptimizations([]));
+      .then((data) => {
+        setRecentOptimizations(data);
+        setIsFirstTimeUser(data.length === 0);
+      })
+      .catch(() => {
+        setRecentOptimizations([]);
+        setIsFirstTimeUser(true);
+      });
   }, []);
 
   // Fetch providers
@@ -229,6 +237,25 @@ export default function Home() {
     (sum, syms) => sum + syms.length,
     0
   );
+
+  // Show welcome empty state for first-time users
+  if (isFirstTimeUser === true) {
+    return (
+      <>
+        <WelcomeEmptyState onStartOptimization={openOptimizationWizard} />
+        <OptimizationWizard open={wizardOpen} onClose={closeOptimizationWizard} />
+      </>
+    );
+  }
+
+  // Show loading state while determining first-time user status
+  if (isFirstTimeUser === null) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+        <Skeleton variant="rectangular" width="100%" height={400} sx={{ borderRadius: 2 }} />
+      </Box>
+    );
+  }
 
   return (
     <>
