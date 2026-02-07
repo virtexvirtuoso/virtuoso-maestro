@@ -20,12 +20,6 @@ import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
 import Tooltip from '@mui/material/Tooltip';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemText from '@mui/material/ListItemText';
 import Skeleton from '@mui/material/Skeleton';
 import Divider from '@mui/material/Divider';
 import Table from '@mui/material/Table';
@@ -44,6 +38,7 @@ import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { useNotification } from '../context/NotificationContext';
+import StrategyCategorySelector from './StrategyCategorySelector';
 
 // Step labels
 const STEPS = ['Data Source', 'Strategy', 'Settings', 'Review'];
@@ -66,14 +61,6 @@ const TIMEFRAMES = [
   { value: '1d', label: '1 Day' },
 ];
 
-// Strategy categories
-const STRATEGY_CATEGORIES = [
-  { key: 'all', name: 'All' },
-  { key: 'technical', name: 'Technical' },
-  { key: 'momentum', name: 'Momentum' },
-  { key: 'mean_reversion', name: 'Mean Reversion' },
-  { key: 'breakout', name: 'Breakout' },
-];
 
 // Optimization type options
 const OPTIMIZATION_TYPES = [
@@ -131,8 +118,6 @@ export default function OptimizationWizard({ open, onClose }) {
   const [loadingStrategies, setLoadingStrategies] = useState(true);
   const [loadingParams, setLoadingParams] = useState(false);
 
-  // Step 2: Category filter
-  const [categoryFilter, setCategoryFilter] = useState('all');
 
   // Fetch providers on mount
   useEffect(() => {
@@ -327,7 +312,6 @@ export default function OptimizationWizard({ open, onClose }) {
     });
     setSymbols([]);
     setStrategyParamDefs([]);
-    setCategoryFilter('all');
     onClose();
   };
 
@@ -338,26 +322,6 @@ export default function OptimizationWizard({ open, onClose }) {
     }
   };
 
-  // Filter strategies by category
-  const filteredStrategies = strategies.filter((s) => {
-    if (categoryFilter === 'all') return true;
-    // Simple heuristic - in real app, strategies would have category metadata
-    const lowerName = s.toLowerCase();
-    if (categoryFilter === 'technical') {
-      return lowerName.includes('ema') || lowerName.includes('macd') ||
-             lowerName.includes('rsi') || lowerName.includes('bollinger');
-    }
-    if (categoryFilter === 'momentum') {
-      return lowerName.includes('momentum') || lowerName.includes('trend');
-    }
-    if (categoryFilter === 'mean_reversion') {
-      return lowerName.includes('mean') || lowerName.includes('reversion');
-    }
-    if (categoryFilter === 'breakout') {
-      return lowerName.includes('breakout') || lowerName.includes('channel');
-    }
-    return true;
-  });
 
   // Render Step 1: Data Source
   const renderDataSourceStep = () => (
@@ -502,58 +466,17 @@ export default function OptimizationWizard({ open, onClose }) {
   // Render Step 2: Strategy
   const renderStrategyStep = () => (
     <Box>
-      {/* Category Tabs */}
-      <Tabs
-        value={categoryFilter}
-        onChange={(e, v) => setCategoryFilter(v)}
-        sx={{ mb: 2, borderBottom: 1, borderColor: 'divider' }}
-      >
-        {STRATEGY_CATEGORIES.map((cat) => (
-          <Tab key={cat.key} label={cat.name} value={cat.key} />
-        ))}
-      </Tabs>
-
-      {/* Strategy List */}
-      <Paper variant="outlined" sx={{ maxHeight: 300, overflow: 'auto', mb: 3 }}>
-        {loadingStrategies ? (
-          <Box sx={{ p: 2 }}>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <Skeleton key={i} height={48} sx={{ mb: 1 }} />
-            ))}
-          </Box>
-        ) : filteredStrategies.length === 0 ? (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Typography color="text.secondary">
-              No strategies found for this category
-            </Typography>
-          </Box>
-        ) : (
-          <List dense>
-            {filteredStrategies.map((strat) => (
-              <ListItem key={strat} disablePadding>
-                <ListItemButton
-                  selected={formData.strategy === strat}
-                  onClick={() => updateFormData('strategy', strat)}
-                >
-                  <ListItemText
-                    primary={strat}
-                    primaryTypographyProps={{
-                      fontWeight: formData.strategy === strat ? 600 : 400,
-                    }}
-                  />
-                  {formData.strategy === strat && (
-                    <CheckCircleIcon color="primary" fontSize="small" />
-                  )}
-                </ListItemButton>
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </Paper>
+      {/* Strategy Category Selector */}
+      <StrategyCategorySelector
+        value={formData.strategy}
+        onChange={(strategyName) => updateFormData('strategy', strategyName)}
+        loading={loadingStrategies}
+        strategies={strategies}
+      />
 
       {/* Strategy Parameters */}
       {formData.strategy && (
-        <>
+        <Box sx={{ mt: 3 }}>
           <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 600 }}>
             Strategy Parameters
           </Typography>
@@ -583,7 +506,7 @@ export default function OptimizationWizard({ open, onClose }) {
               ))}
             </Grid>
           )}
-        </>
+        </Box>
       )}
     </Box>
   );
