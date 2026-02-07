@@ -10,6 +10,8 @@ import IconButton from '@mui/material/IconButton';
 import PlayCircleFilledWhiteIcon from '@mui/icons-material/PlayCircleFilledWhite';
 import OptimizationProgress from './OptimizationProgress';
 import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
+import Tooltip from '@mui/material/Tooltip';
 import FormLabel from '@mui/material/FormLabel';
 import RadioGroup from '@mui/material/RadioGroup';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -317,17 +319,27 @@ export default function OptimizationForm() {
             type="number"
             value={cash}
             onChange={(e) => setCash(Number(e.target.value))}
+            helperText="Initial portfolio value for simulation"
+            InputProps={{
+              startAdornment: <InputAdornment position="start">$</InputAdornment>,
+            }}
           />
         </FormControl>
-        <FormControl sx={formControlSx}>
-          <TextField
-            id="commissions-text"
-            label="Commissions"
-            type="number"
-            value={commissions}
-            onChange={(e) => setCommissions(Number(e.target.value))}
-          />
-        </FormControl>
+        <Tooltip title="Commission fee applied per trade. Enter as percentage (e.g., 0.1 = 0.1%)" arrow>
+          <FormControl sx={formControlSx}>
+            <TextField
+              id="commissions-text"
+              label="Commissions"
+              type="number"
+              value={commissions}
+              onChange={(e) => setCommissions(Number(e.target.value))}
+              helperText="Typical: 0.05-0.20% for crypto exchanges"
+              InputProps={{
+                endAdornment: <InputAdornment position="end">%</InputAdornment>,
+              }}
+            />
+          </FormControl>
+        </Tooltip>
         <FormControl sx={formControlSx}>
           {loadingStrategies ? (
             <Skeleton variant="rectangular" height={56} />
