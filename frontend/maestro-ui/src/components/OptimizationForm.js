@@ -6,8 +6,9 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
-import IconButton from '@mui/material/IconButton';
-import PlayCircleFilledWhiteIcon from '@mui/icons-material/PlayCircleFilledWhite';
+import Button from '@mui/material/Button';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import CircularProgress from '@mui/material/CircularProgress';
 import OptimizationProgress from './OptimizationProgress';
 import TextField from '@mui/material/TextField';
 import InputAdornment from '@mui/material/InputAdornment';
@@ -389,10 +390,22 @@ export default function OptimizationForm() {
           </RadioGroup>
         </FormControl>
         <Grid container direction="row" justifyContent="flex-end" alignItems="center">
-          <Box>
-            <IconButton aria-label="Run new test" onClick={submitTest} sx={{ m: 0.5 }}>
-              <PlayCircleFilledWhiteIcon color="primary" fontSize="large" />
-            </IconButton>
+          <Box sx={{ m: 0.5 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={submitTest}
+              disabled={!provider || !symbol || !strategy || isRunning}
+              startIcon={
+                isRunning ? (
+                  <CircularProgress size={20} color="inherit" />
+                ) : (
+                  <PlayArrowIcon />
+                )
+              }
+            >
+              {isRunning ? 'Running...' : 'Run Optimization'}
+            </Button>
           </Box>
         </Grid>
         {isRunning && (
