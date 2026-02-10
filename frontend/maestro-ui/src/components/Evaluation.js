@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
+import Box from '@mui/material/Box';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import Chip from '@mui/material/Chip';
 import Title from './Title';
 import Table from '@mui/material/Table';
 import TableContainer from '@mui/material/TableContainer';
@@ -18,6 +22,9 @@ import ListItemAvatar from '@mui/material/ListItemAvatar';
 import Avatar from '@mui/material/Avatar';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import TimerIcon from '@mui/icons-material/Timer';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+import TrendingDownIcon from '@mui/icons-material/TrendingDown';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
 import StrategyChart from './StrategyChart';
 import PnLChart from './PnLChart';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
@@ -42,6 +49,70 @@ import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
 import EmptyState from './EmptyState';
 import AssessmentIcon from '@mui/icons-material/Assessment';
+
+// Section tabs configuration
+const SECTION_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'charts', label: 'Charts' },
+  { id: 'metrics', label: 'Metrics' },
+  { id: 'walkforward', label: 'Walk-Forward' },
+  { id: 'analysis', label: 'Analysis' },
+];
+
+// Summary metric card component
+function MetricCard({ label, value, icon: Icon, trend, color }) {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        bgcolor: 'background.paper',
+        border: '1px solid',
+        borderColor: 'divider',
+        borderRadius: 2,
+        minWidth: 140,
+        flex: 1,
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+        {Icon && <Icon sx={{ fontSize: 18, color: 'text.secondary' }} />}
+        <Box
+          component="span"
+          sx={{
+            fontSize: '0.75rem',
+            color: 'text.secondary',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
+        >
+          {label}
+        </Box>
+      </Box>
+      <Box
+        sx={{
+          fontSize: '1.5rem',
+          fontWeight: 700,
+          fontFamily: '"IBM Plex Mono", monospace',
+          color: color || 'text.primary',
+        }}
+      >
+        {value}
+      </Box>
+      {trend !== undefined && (
+        <Chip
+          size="small"
+          icon={trend >= 0 ? <TrendingUpIcon /> : <TrendingDownIcon />}
+          label={`${trend >= 0 ? '+' : ''}${(trend * 100).toFixed(1)}%`}
+          color={trend >= 0 ? 'success' : 'error'}
+          sx={{ mt: 0.5, height: 20, fontSize: '0.7rem' }}
+        />
+      )}
+    </Paper>
+  );
+}
 
 const paperSx = {
   p: 2,
@@ -86,6 +157,34 @@ export default function Evaluation() {
   const [tid, setTid] = useState('');
   const [availableTests, setAvailableTests] = useState([]);
   const [results, setResults] = useState({});
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // Extract summary metrics from results
+  const summaryMetrics = useMemo(() => {
+    if (Object.keys(results).length === 0) return null;
+
+    try {
+      const backtesting = results?.optimizations?.BACKTESTING;
+      const pyfolio = backtesting?.[0]?.analyzers?.PyFolio;
+
+      if (!pyfolio) return null;
+
+      return {
+        sharpe: pyfolio['Sharpe ratio'],
+        annualReturn: pyfolio['Annual return'],
+        maxDrawdown: pyfolio['Max drawdown'],
+        volatility: pyfolio['Annual volatility'],
+        calmar: pyfolio['Calmar ratio'],
+        sortino: pyfolio['Sortino ratio'],
+      };
+    } catch {
+      return null;
+    }
+  }, [results]);
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
 
   const fetchResults = useCallback((testId) => {
     if (!testId) return;
@@ -638,114 +737,215 @@ export default function Evaluation() {
 
   return (
     <Grid container spacing={3}>
+      {/* Test Selector */}
       <Grid item xs={12}>
         <Paper sx={paperSx}>
-          <Title>Tests</Title>
-          <FormControl sx={formControlSx}>
-            <InputLabel id="test-select-label">Test</InputLabel>
-            <Select
-              labelId="test-select-label"
-              id="test-select"
-              name="test"
-              value={tid}
-              label="Test"
-              onChange={handleInputChange}
-            >
-              {availableTests
-                .sort((a, b) => (a['test_name'] < b['test_name'] ? -1 : 1))
-                .map((row) => (
-                  <MenuItem key={row['tid']} value={row['tid']}>
-                    {row['test_name']}
-                  </MenuItem>
-                ))}
-            </Select>
-          </FormControl>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+            <Title>Evaluation</Title>
+            <FormControl sx={{ minWidth: 250 }} size="small">
+              <InputLabel id="test-select-label">Select Test</InputLabel>
+              <Select
+                labelId="test-select-label"
+                id="test-select"
+                name="test"
+                value={tid}
+                label="Select Test"
+                onChange={handleInputChange}
+              >
+                {availableTests
+                  .sort((a, b) => (a['test_name'] < b['test_name'] ? -1 : 1))
+                  .map((row) => (
+                    <MenuItem key={row['tid']} value={row['tid']}>
+                      {row['test_name']}
+                    </MenuItem>
+                  ))}
+              </Select>
+            </FormControl>
+          </Box>
         </Paper>
       </Grid>
+
+      {/* Summary Metrics Row */}
+      {summaryMetrics && (
+        <Grid item xs={12}>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <MetricCard
+              label="Sharpe Ratio"
+              value={summaryMetrics.sharpe?.toFixed(2) ?? '—'}
+              icon={ShowChartIcon}
+              color={summaryMetrics.sharpe >= 1 ? 'success.main' : summaryMetrics.sharpe >= 0 ? 'warning.main' : 'error.main'}
+            />
+            <MetricCard
+              label="Annual Return"
+              value={summaryMetrics.annualReturn ? `${(summaryMetrics.annualReturn * 100).toFixed(1)}%` : '—'}
+              icon={TrendingUpIcon}
+              color={summaryMetrics.annualReturn >= 0 ? 'success.main' : 'error.main'}
+            />
+            <MetricCard
+              label="Max Drawdown"
+              value={summaryMetrics.maxDrawdown ? `${(summaryMetrics.maxDrawdown * 100).toFixed(1)}%` : '—'}
+              icon={TrendingDownIcon}
+              color={summaryMetrics.maxDrawdown > -0.1 ? 'success.main' : summaryMetrics.maxDrawdown > -0.2 ? 'warning.main' : 'error.main'}
+            />
+            <MetricCard
+              label="Volatility"
+              value={summaryMetrics.volatility ? `${(summaryMetrics.volatility * 100).toFixed(1)}%` : '—'}
+              icon={ShowChartIcon}
+            />
+            <MetricCard
+              label="Calmar Ratio"
+              value={summaryMetrics.calmar?.toFixed(2) ?? '—'}
+              icon={ShowChartIcon}
+              color={summaryMetrics.calmar >= 1 ? 'success.main' : 'text.primary'}
+            />
+            <MetricCard
+              label="Sortino Ratio"
+              value={summaryMetrics.sortino?.toFixed(2) ?? '—'}
+              icon={ShowChartIcon}
+              color={summaryMetrics.sortino >= 1 ? 'success.main' : 'text.primary'}
+            />
+          </Box>
+        </Grid>
+      )}
+
+      {/* Section Navigation Tabs */}
       <Grid item xs={12}>
-        <Paper sx={paperSx}>
-          <Title>Strategy Evaluation</Title>
-          {getStrategyDetails()}
+        <Paper sx={{ ...paperSx, p: 0 }}>
+          <Tabs
+            value={activeTab}
+            onChange={handleTabChange}
+            variant="scrollable"
+            scrollButtons="auto"
+            sx={{
+              borderBottom: 1,
+              borderColor: 'divider',
+              '& .MuiTab-root': {
+                textTransform: 'none',
+                fontWeight: 600,
+                minWidth: 100,
+              },
+            }}
+          >
+            {SECTION_TABS.map((tab) => (
+              <Tab key={tab.id} label={tab.label} value={tab.id} />
+            ))}
+          </Tabs>
         </Paper>
       </Grid>
-      <Grid item xs={12}>
-        <Paper sx={paperSx}>
-          <Title>Backtest Strategy Chart</Title>
-          {getBacktestStrategyChart()}
-        </Paper>
-      </Grid>
-      <Grid item xs={12}>
-        <Paper sx={paperSx}>
-          <Title>Walkforward Strategy Chart</Title>
-          {getWalkForwardStrategyChart()}
-        </Paper>
-      </Grid>
-      <Grid item xs={6}>
-        <Paper sx={paperSx}>
-          <Title>Backtesting</Title>
-          {getBacktestMetrics()}
-        </Paper>
-      </Grid>
-      <Grid item xs={6}>
-        <Paper sx={paperSx}>
-          <Title>Walk Forward</Title>
-          <WalkForwardMetrics tid={tid} data={results} />
-        </Paper>
-      </Grid>
-      <Grid item xs={12}>
-        <Paper sx={paperSx}>
-          <Title>QuantStats Report</Title>
-          {getQuantStatsReport()}
-        </Paper>
-      </Grid>
-      <Grid item xs={12}>
-        <Paper sx={paperSx}>
-          <Title>Monthly Returns Heatmap</Title>
-          {getMonthlyReturnsHeatmap()}
-        </Paper>
-      </Grid>
-      <Grid item xs={12}>
-        <Paper sx={paperSx}>
-          <Title>Walk-Forward Timeline</Title>
-          {getWalkForwardTimeline()}
-        </Paper>
-      </Grid>
-      <Grid item xs={12}>
-        <Paper sx={paperSx}>
-          <Title>Parameter Stability</Title>
-          {getParameterStabilityChart()}
-        </Paper>
-      </Grid>
-      <Grid item xs={12}>
-        <Paper sx={paperSx}>
-          <Title>Backtest PnL Chart</Title>
-          {getBacktestPnLChart()}
-        </Paper>
-      </Grid>
-      <Grid item xs={12}>
-        <Paper sx={paperSx}>
-          <Title>Walkforward PnL Chart</Title>
-          {getWalkForwardPnLChart()}
-        </Paper>
-      </Grid>
-      <Grid item xs={12}>
-        <Paper sx={paperSx}>
-          <Title>Parameters Distribution</Title>
-          {getParametersDistribution()}
-        </Paper>
-      </Grid>
-      <Grid item xs={12}>
-        <Paper sx={paperSx}>
-          <Title>Heatmap Chart</Title>
-          {getHeatMapChart()}
-        </Paper>
-      </Grid>
-      <Grid item xs={12}>
-        <Paper sx={paperSx}>
-          <Title>Optuna Optimization</Title>
-          {getOptunaVisualization()}
-        </Paper>
-      </Grid>
+
+      {/* Overview Tab */}
+      {activeTab === 'overview' && (
+        <>
+          <Grid item xs={12}>
+            <Paper sx={paperSx}>
+              <Title>Strategy Evaluation</Title>
+              {getStrategyDetails()}
+            </Paper>
+          </Grid>
+          <Grid item xs={6}>
+            <Paper sx={paperSx}>
+              <Title>Backtesting Metrics</Title>
+              {getBacktestMetrics()}
+            </Paper>
+          </Grid>
+          <Grid item xs={6}>
+            <Paper sx={paperSx}>
+              <Title>Walk Forward Metrics</Title>
+              <WalkForwardMetrics tid={tid} data={results} />
+            </Paper>
+          </Grid>
+        </>
+      )}
+
+      {/* Charts Tab */}
+      {activeTab === 'charts' && (
+        <>
+          <Grid item xs={12}>
+            <Paper sx={paperSx}>
+              <Title>Backtest Strategy Chart</Title>
+              {getBacktestStrategyChart()}
+            </Paper>
+          </Grid>
+          <Grid item xs={12}>
+            <Paper sx={paperSx}>
+              <Title>Backtest PnL Chart</Title>
+              {getBacktestPnLChart()}
+            </Paper>
+          </Grid>
+          <Grid item xs={12}>
+            <Paper sx={paperSx}>
+              <Title>Walk-Forward Strategy Chart</Title>
+              {getWalkForwardStrategyChart()}
+            </Paper>
+          </Grid>
+          <Grid item xs={12}>
+            <Paper sx={paperSx}>
+              <Title>Walk-Forward PnL Chart</Title>
+              {getWalkForwardPnLChart()}
+            </Paper>
+          </Grid>
+        </>
+      )}
+
+      {/* Metrics Tab */}
+      {activeTab === 'metrics' && (
+        <>
+          <Grid item xs={12}>
+            <Paper sx={paperSx}>
+              <Title>QuantStats Report</Title>
+              {getQuantStatsReport()}
+            </Paper>
+          </Grid>
+          <Grid item xs={12}>
+            <Paper sx={paperSx}>
+              <Title>Monthly Returns Heatmap</Title>
+              {getMonthlyReturnsHeatmap()}
+            </Paper>
+          </Grid>
+        </>
+      )}
+
+      {/* Walk-Forward Tab */}
+      {activeTab === 'walkforward' && (
+        <>
+          <Grid item xs={12}>
+            <Paper sx={paperSx}>
+              <Title>Walk-Forward Timeline</Title>
+              {getWalkForwardTimeline()}
+            </Paper>
+          </Grid>
+          <Grid item xs={12}>
+            <Paper sx={paperSx}>
+              <Title>Parameter Stability</Title>
+              {getParameterStabilityChart()}
+            </Paper>
+          </Grid>
+        </>
+      )}
+
+      {/* Analysis Tab */}
+      {activeTab === 'analysis' && (
+        <>
+          <Grid item xs={12}>
+            <Paper sx={paperSx}>
+              <Title>Parameters Distribution</Title>
+              {getParametersDistribution()}
+            </Paper>
+          </Grid>
+          <Grid item xs={12}>
+            <Paper sx={paperSx}>
+              <Title>Heatmap Chart</Title>
+              {getHeatMapChart()}
+            </Paper>
+          </Grid>
+          <Grid item xs={12}>
+            <Paper sx={paperSx}>
+              <Title>Optuna Optimization</Title>
+              {getOptunaVisualization()}
+            </Paper>
+          </Grid>
+        </>
+      )}
     </Grid>
   );
 }

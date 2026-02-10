@@ -12,11 +12,8 @@ import TableContainer from '@mui/material/TableContainer';
 import TablePagination from '@mui/material/TablePagination';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
 import ViewListIcon from '@mui/icons-material/ViewList';
-import { TreeView } from '@mui/x-tree-view/TreeView';
-import { TreeItem } from '@mui/x-tree-view/TreeItem';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EmptyState from './EmptyState';
 import ScienceIcon from '@mui/icons-material/Science';
@@ -26,36 +23,53 @@ import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
 
+// Compact test type chips with tooltip for details
 function PerformedTests({ rowElement }) {
-  const tests = Object.keys(rowElement);
+  if (!rowElement || typeof rowElement !== 'object') {
+    return <span>—</span>;
+  }
+
+  const tests = Object.keys(rowElement).filter((t) => rowElement[t]?.length > 0);
+
+  if (tests.length === 0) {
+    return <span>—</span>;
+  }
+
+  // Build tooltip content showing parameter details
+  const tooltipContent = tests.map((testType) => {
+    const runs = rowElement[testType];
+    const paramSummary = runs.map((run, i) => {
+      const params = run.parameters || {};
+      const paramStr = Object.entries(params)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(', ');
+      return `  ${run.num_split !== null ? `Split ${run.num_split}: ` : ''}${paramStr}`;
+    }).join('\n');
+    return `${testType} (${runs.length} runs)\n${paramSummary}`;
+  }).join('\n\n');
 
   return (
-    <TreeView
-      defaultCollapseIcon={<ExpandMoreIcon />}
-      defaultExpandIcon={<ChevronRightIcon />}
+    <Tooltip
+      title={<pre style={{ margin: 0, fontSize: '11px', whiteSpace: 'pre-wrap' }}>{tooltipContent}</pre>}
+      arrow
+      placement="left"
     >
-      {tests
-        .filter((t) => rowElement[t].length > 0)
-        .map((t, i) => (
-          <TreeItem nodeId={i.toString()} key={t} label={t}>
-            {rowElement[t].map((test, j) => (
-              <TreeItem
-                nodeId={`params-${i}-${j}`}
-                key={`params-${i}-${j}`}
-                label={'Parameters ' + (test['num_split'] !== null ? test['num_split'] : '')}
-              >
-                {Object.keys(test['parameters']).map((p) => (
-                  <TreeItem
-                    nodeId={`params-${i}-${j}-${p}`}
-                    key={`params-${i}-${j}-${p}`}
-                    label={p + ': ' + test['parameters'][p]}
-                  />
-                ))}
-              </TreeItem>
-            ))}
-          </TreeItem>
+      <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+        {tests.map((testType) => (
+          <Chip
+            key={testType}
+            label={`${testType} (${rowElement[testType].length})`}
+            size="small"
+            variant="outlined"
+            sx={{
+              fontSize: '0.7rem',
+              height: 20,
+              '& .MuiChip-label': { px: 1 }
+            }}
+          />
         ))}
-    </TreeView>
+      </Box>
+    </Tooltip>
   );
 }
 
@@ -86,6 +100,24 @@ function formatSharpe(value) {
     return '—';
   }
   return Number(value).toFixed(2);
+}
+
+// Format date consistently as "Jan 15, 2026 14:30"
+function formatDate(dateString) {
+  if (!dateString) return '—';
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return '—';
+  }
 }
 
 // Extract best Sharpe from optimizations
@@ -141,11 +173,16 @@ export default function OptimizationResults() {
     fetch(`${process.env.REACT_APP_REST_API_URL}/optimization/results`)
       .then((response) => response.json())
       .then((data) => {
-        // Enhance data with computed fields
-        const enhancedData = data.map((row) => ({
+        // Handle both old (optimizations) and new (summary) API formats
+        const enhancedData = (Array.isArray(data) ? data : []).map((row) => ({
           ...row,
-          sharpe: extractBestSharpe(row.optimizations),
-          status: row.status || 'completed', // Default to completed if not specified
+          // New format has summary.sharpe_ratio, old format needs extractBestSharpe
+          sharpe: row.summary?.sharpe_ratio ?? extractBestSharpe(row.optimizations),
+          status: row.status || 'completed',
+          // Map fields for consistency
+          provider: row.provider || 'BINANCE',
+          timeframe: row.timeframe || row.bin_size || '1d',
+          creation_time: row.creation_time || new Date().toISOString(),
         }));
         setResults(enhancedData);
       })
@@ -332,7 +369,7 @@ export default function OptimizationResults() {
                     {paginatedResults.map((row) => (
                       <TableRow key={row['tid']} hover>
                         <TableCell>{row['test_name']}</TableCell>
-                        <TableCell>{new Date(row['creation_time']).toLocaleString()}</TableCell>
+                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row['creation_time'])}</TableCell>
                         <TableCell>{row['strategy']}</TableCell>
                         <TableCell>{row['provider']}</TableCell>
                         <TableCell>{row['symbol']}</TableCell>
@@ -347,12 +384,16 @@ export default function OptimizationResults() {
                           <PerformedTests rowElement={row['optimizations']} />
                         </TableCell>
                         <TableCell>
-                          <IconButton onClick={() => handleComparePage(row['tid'])}>
-                            <ViewListIcon />
-                          </IconButton>
-                          <IconButton onClick={() => handleDeleteOptResult(row['tid'])}>
-                            <DeleteIcon />
-                          </IconButton>
+                          <Tooltip title="View Details" arrow>
+                            <IconButton onClick={() => handleComparePage(row['tid'])}>
+                              <ViewListIcon />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Delete" arrow>
+                            <IconButton onClick={() => handleDeleteOptResult(row['tid'])}>
+                              <DeleteIcon />
+                            </IconButton>
+                          </Tooltip>
                         </TableCell>
                       </TableRow>
                     ))}
