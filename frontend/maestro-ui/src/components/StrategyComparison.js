@@ -119,10 +119,17 @@ export default function StrategyComparison() {
 
   // Fetch available tests on mount
   useEffect(() => {
-    fetch(`${process.env.REACT_APP_REST_API_URL}/optimization/results/available`)
+    fetch(`${process.env.REACT_APP_REST_API_URL}/optimization/results`)
       .then((response) => response.json())
-      .then((available) => setAvailableTests(available))
-      .catch((error) => console.error('Failed to fetch available tests:', error));
+      .then((data) => {
+        // Ensure we always have an array
+        const available = Array.isArray(data) ? data : [];
+        setAvailableTests(available);
+      })
+      .catch((error) => {
+        console.error('Failed to fetch available tests:', error);
+        setAvailableTests([]);
+      });
   }, []);
 
   // Initialize from URL params

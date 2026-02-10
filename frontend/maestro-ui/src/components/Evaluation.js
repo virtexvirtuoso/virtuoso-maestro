@@ -96,14 +96,20 @@ export default function Evaluation() {
   }, []);
 
   useEffect(() => {
-    fetch(`${process.env.REACT_APP_REST_API_URL}/optimization/results/available`)
+    fetch(`${process.env.REACT_APP_REST_API_URL}/optimization/results`)
       .then((response) => response.json())
-      .then((available) => {
+      .then((data) => {
+        // Ensure we always have an array
+        const available = Array.isArray(data) ? data : [];
         setAvailableTests(available);
         if (paramTid) {
           setTid(paramTid);
           fetchResults(paramTid);
         }
+      })
+      .catch((error) => {
+        console.error('Failed to fetch available tests:', error);
+        setAvailableTests([]);
       });
   }, [paramTid, fetchResults]);
 
