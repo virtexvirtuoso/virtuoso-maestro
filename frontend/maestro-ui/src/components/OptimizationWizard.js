@@ -36,6 +36,7 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -61,13 +62,56 @@ const PROVIDER_CONFIG = {
 
 // Timeframe options (used for display in Review step)
 const TIMEFRAMES = [
-  { value: '1m', label: '1 Min' },
-  { value: '5m', label: '5 Min' },
-  { value: '15m', label: '15 Min' },
-  { value: '1h', label: '1 Hour' },
-  { value: '4h', label: '4 Hour' },
-  { value: '1d', label: '1 Day' },
+  { value: '1m', label: '1 Min', minutes: 1 },
+  { value: '5m', label: '5 Min', minutes: 5 },
+  { value: '15m', label: '15 Min', minutes: 15 },
+  { value: '1h', label: '1 Hour', minutes: 60 },
+  { value: '4h', label: '4 Hour', minutes: 240 },
+  { value: '1d', label: '1 Day', minutes: 1440 },
 ];
+
+// Estimate run time based on data size and optimization settings
+function estimateRunTime(startDate, endDate, binSize, optType, wfoSplits) {
+  const timeframeConfig = TIMEFRAMES.find((t) => t.value === binSize);
+  if (!timeframeConfig || !startDate || !endDate) return null;
+
+  const durationMs = endDate.getTime() - startDate.getTime();
+  const durationMinutes = durationMs / (1000 * 60);
+  const dataPoints = Math.floor(durationMinutes / timeframeConfig.minutes);
+
+  // Base time per iteration (calibrated estimate - adjust based on actual benchmarks)
+  const timePerIterationSec = 0.005; // ~5ms per candle per iteration
+
+  let estimatedSeconds;
+  if (optType === 'BACKTESTING') {
+    // Single pass through data
+    estimatedSeconds = dataPoints * timePerIterationSec;
+  } else if (optType === 'WALKFORWARD') {
+    // Multiple passes: splits × train iterations + test passes
+    // Assume ~50 parameter combinations tested per split on average
+    const paramCombinations = 50;
+    estimatedSeconds = wfoSplits * paramCombinations * dataPoints * timePerIterationSec;
+  } else {
+    // BOTH: backtest + walkforward
+    const paramCombinations = 50;
+    estimatedSeconds =
+      dataPoints * timePerIterationSec +
+      wfoSplits * paramCombinations * dataPoints * timePerIterationSec;
+  }
+
+  // Add overhead for data loading, result storage, etc.
+  estimatedSeconds += 10;
+
+  if (estimatedSeconds < 60) {
+    return `~${Math.ceil(estimatedSeconds)} seconds`;
+  } else if (estimatedSeconds < 3600) {
+    return `~${Math.ceil(estimatedSeconds / 60)} minutes`;
+  } else {
+    const hours = Math.floor(estimatedSeconds / 3600);
+    const mins = Math.ceil((estimatedSeconds % 3600) / 60);
+    return `~${hours}h ${mins}m`;
+  }
+}
 
 
 // Optimization type labels for review display
@@ -675,12 +719,51 @@ export default function OptimizationWizard({ open, onClose, initialPreset }) {
     </Box>
   );
 
+  // Calculate estimated run time
+  const estimatedTime = useMemo(() => {
+    return estimateRunTime(
+      formData.startDate,
+      formData.endDate,
+      formData.binSize,
+      formData.optType,
+      formData.wfoSplits
+    );
+  }, [formData.startDate, formData.endDate, formData.binSize, formData.optType, formData.wfoSplits]);
+
   // Render Step 4: Review
   const renderReviewStep = () => (
     <Box>
       <Alert severity="info" sx={{ mb: 3 }}>
         Review your optimization settings before running
       </Alert>
+
+      {/* Estimated Run Time */}
+      {estimatedTime && (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2,
+            mb: 3,
+            bgcolor: 'action.hover',
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+          }}
+        >
+          <AccessTimeIcon sx={{ color: 'primary.main' }} />
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              Estimated Run Time: {estimatedTime}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Actual time may vary based on system load and strategy complexity
+            </Typography>
+          </Box>
+        </Paper>
+      )}
 
       {/* Summary Table */}
       <Paper variant="outlined" sx={{ mb: 3 }}>

@@ -6,6 +6,10 @@ import Box from '@mui/material/Box';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Chip from '@mui/material/Chip';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import Title from './Title';
 import Table from '@mui/material/Table';
 import TableContainer from '@mui/material/TableContainer';
@@ -120,6 +124,52 @@ const paperSx = {
   overflow: 'auto',
   flexDirection: 'column',
 };
+
+// Collapsible section component with localStorage persistence
+function CollapsibleSection({ id, title, subtitle, defaultExpanded = false, children }) {
+  const storageKey = `eval_section_${id}`;
+  const [expanded, setExpanded] = useState(() => {
+    const stored = localStorage.getItem(storageKey);
+    return stored !== null ? stored === 'true' : defaultExpanded;
+  });
+
+  const handleChange = (event, isExpanded) => {
+    setExpanded(isExpanded);
+    localStorage.setItem(storageKey, isExpanded.toString());
+  };
+
+  return (
+    <Accordion
+      expanded={expanded}
+      onChange={handleChange}
+      sx={{
+        '&:before': { display: 'none' },
+        bgcolor: 'background.paper',
+        boxShadow: 1,
+      }}
+    >
+      <AccordionSummary
+        expandIcon={<ExpandMoreIcon />}
+        sx={{
+          '& .MuiAccordionSummary-content': {
+            alignItems: 'center',
+            gap: 2,
+          },
+        }}
+      >
+        <Box sx={{ fontWeight: 600, fontSize: '1rem' }}>{title}</Box>
+        {subtitle && !expanded && (
+          <Chip
+            label={subtitle}
+            size="small"
+            sx={{ ml: 'auto', mr: 1, bgcolor: 'action.hover' }}
+          />
+        )}
+      </AccordionSummary>
+      <AccordionDetails sx={{ pt: 0 }}>{children}</AccordionDetails>
+    </Accordion>
+  );
+}
 
 const formControlSx = { m: 0.5, minWidth: 120 };
 
@@ -859,92 +909,59 @@ export default function Evaluation() {
 
       {/* Charts Tab */}
       {activeTab === 'charts' && (
-        <>
-          <Grid item xs={12}>
-            <Paper sx={paperSx}>
-              <Title>Backtest Strategy Chart</Title>
-              {getBacktestStrategyChart()}
-            </Paper>
-          </Grid>
-          <Grid item xs={12}>
-            <Paper sx={paperSx}>
-              <Title>Backtest PnL Chart</Title>
-              {getBacktestPnLChart()}
-            </Paper>
-          </Grid>
-          <Grid item xs={12}>
-            <Paper sx={paperSx}>
-              <Title>Walk-Forward Strategy Chart</Title>
-              {getWalkForwardStrategyChart()}
-            </Paper>
-          </Grid>
-          <Grid item xs={12}>
-            <Paper sx={paperSx}>
-              <Title>Walk-Forward PnL Chart</Title>
-              {getWalkForwardPnLChart()}
-            </Paper>
-          </Grid>
-        </>
+        <Grid item xs={12}>
+          <CollapsibleSection id="backtest-strategy" title="Backtest Strategy Chart" defaultExpanded={true}>
+            {getBacktestStrategyChart()}
+          </CollapsibleSection>
+          <CollapsibleSection id="backtest-pnl" title="Backtest PnL Chart" subtitle="Profit/Loss">
+            {getBacktestPnLChart()}
+          </CollapsibleSection>
+          <CollapsibleSection id="wfo-strategy" title="Walk-Forward Strategy Chart">
+            {getWalkForwardStrategyChart()}
+          </CollapsibleSection>
+          <CollapsibleSection id="wfo-pnl" title="Walk-Forward PnL Chart" subtitle="Out-of-Sample">
+            {getWalkForwardPnLChart()}
+          </CollapsibleSection>
+        </Grid>
       )}
 
       {/* Metrics Tab */}
       {activeTab === 'metrics' && (
-        <>
-          <Grid item xs={12}>
-            <Paper sx={paperSx}>
-              <Title>QuantStats Report</Title>
-              {getQuantStatsReport()}
-            </Paper>
-          </Grid>
-          <Grid item xs={12}>
-            <Paper sx={paperSx}>
-              <Title>Monthly Returns Heatmap</Title>
-              {getMonthlyReturnsHeatmap()}
-            </Paper>
-          </Grid>
-        </>
+        <Grid item xs={12}>
+          <CollapsibleSection id="quantstats" title="QuantStats Report" defaultExpanded={true}>
+            {getQuantStatsReport()}
+          </CollapsibleSection>
+          <CollapsibleSection id="monthly-returns" title="Monthly Returns Heatmap" subtitle="Performance by Month">
+            {getMonthlyReturnsHeatmap()}
+          </CollapsibleSection>
+        </Grid>
       )}
 
       {/* Walk-Forward Tab */}
       {activeTab === 'walkforward' && (
-        <>
-          <Grid item xs={12}>
-            <Paper sx={paperSx}>
-              <Title>Walk-Forward Timeline</Title>
-              {getWalkForwardTimeline()}
-            </Paper>
-          </Grid>
-          <Grid item xs={12}>
-            <Paper sx={paperSx}>
-              <Title>Parameter Stability</Title>
-              {getParameterStabilityChart()}
-            </Paper>
-          </Grid>
-        </>
+        <Grid item xs={12}>
+          <CollapsibleSection id="wfo-timeline" title="Walk-Forward Timeline" defaultExpanded={true} subtitle="Train/Test Splits">
+            {getWalkForwardTimeline()}
+          </CollapsibleSection>
+          <CollapsibleSection id="param-stability" title="Parameter Stability" subtitle="Across Splits">
+            {getParameterStabilityChart()}
+          </CollapsibleSection>
+        </Grid>
       )}
 
       {/* Analysis Tab */}
       {activeTab === 'analysis' && (
-        <>
-          <Grid item xs={12}>
-            <Paper sx={paperSx}>
-              <Title>Parameters Distribution</Title>
-              {getParametersDistribution()}
-            </Paper>
-          </Grid>
-          <Grid item xs={12}>
-            <Paper sx={paperSx}>
-              <Title>Heatmap Chart</Title>
-              {getHeatMapChart()}
-            </Paper>
-          </Grid>
-          <Grid item xs={12}>
-            <Paper sx={paperSx}>
-              <Title>Optuna Optimization</Title>
-              {getOptunaVisualization()}
-            </Paper>
-          </Grid>
-        </>
+        <Grid item xs={12}>
+          <CollapsibleSection id="param-dist" title="Parameters Distribution" defaultExpanded={true} subtitle="WFO vs Backtest">
+            {getParametersDistribution()}
+          </CollapsibleSection>
+          <CollapsibleSection id="heatmap" title="Heatmap Chart" subtitle="Parameter Correlation">
+            {getHeatMapChart()}
+          </CollapsibleSection>
+          <CollapsibleSection id="optuna" title="Optuna Optimization" subtitle="Hyperparameter Search">
+            {getOptunaVisualization()}
+          </CollapsibleSection>
+        </Grid>
       )}
     </Grid>
   );
