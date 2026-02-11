@@ -13,8 +13,12 @@ import TablePagination from '@mui/material/TablePagination';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
+import Checkbox from '@mui/material/Checkbox';
+import Button from '@mui/material/Button';
+import Fade from '@mui/material/Fade';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import DeleteIcon from '@mui/icons-material/Delete';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import EmptyState from './EmptyState';
 import ScienceIcon from '@mui/icons-material/Science';
 import SearchOffIcon from '@mui/icons-material/SearchOff';
@@ -22,6 +26,9 @@ import Chip from '@mui/material/Chip';
 import Autocomplete from '@mui/material/Autocomplete';
 import TextField from '@mui/material/TextField';
 import Box from '@mui/material/Box';
+
+// Status options for filtering
+const STATUS_OPTIONS = ['All', 'Completed', 'Failed', 'Running', 'Pending'];
 
 // Compact test type chips with tooltip for details
 function PerformedTests({ rowElement }) {
@@ -142,6 +149,7 @@ function extractBestSharpe(optimizations) {
 
 // Column configuration for sortable headers
 const columns = [
+  { id: 'checkbox', label: '', sortable: false, width: 50 },
   { id: 'test_name', label: 'Name', sortable: false },
   { id: 'creation_time', label: 'Date', sortable: true },
   { id: 'strategy', label: 'Strategy', sortable: true },
@@ -164,6 +172,10 @@ export default function OptimizationResults() {
 
   // Filter state
   const [strategyFilter, setStrategyFilter] = useState(null);
+  const [statusFilter, setStatusFilter] = useState('All');
+
+  // Selection state
+  const [selectedTids, setSelectedTids] = useState(new Set());
 
   // Pagination state
   const [page, setPage] = useState(0);
@@ -215,6 +227,11 @@ export default function OptimizationResults() {
       filtered = filtered.filter((r) => r.strategy === strategyFilter);
     }
 
+    // Apply status filter
+    if (statusFilter && statusFilter !== 'All') {
+      filtered = filtered.filter((r) => r.status?.toLowerCase() === statusFilter.toLowerCase());
+    }
+
     // Sort results
     const comparator = (a, b) => {
       let aVal = a[orderBy];
@@ -236,7 +253,7 @@ export default function OptimizationResults() {
     };
 
     return [...filtered].sort(comparator);
-  }, [results, strategyFilter, orderBy, order]);
+  }, [results, strategyFilter, statusFilter, orderBy, order]);
 
   // Get paginated results
   const paginatedResults = useMemo(() => {
@@ -278,6 +295,59 @@ export default function OptimizationResults() {
     setPage(0); // Reset to first page when filter changes
   }, []);
 
+  const handleStatusFilterChange = useCallback((event, newValue) => {
+    setStatusFilter(newValue || 'All');
+    setPage(0);
+  }, []);
+
+  // Selection handlers
+  const handleSelectAll = useCallback((event) => {
+    if (event.target.checked) {
+      const allTids = new Set(processedResults.map((r) => r.tid));
+      setSelectedTids(allTids);
+    } else {
+      setSelectedTids(new Set());
+    }
+  }, [processedResults]);
+
+  const handleSelectOne = useCallback((tid) => {
+    setSelectedTids((prev) => {
+      const next = new Set(prev);
+      if (next.has(tid)) {
+        next.delete(tid);
+      } else {
+        next.add(tid);
+      }
+      return next;
+    });
+  }, []);
+
+  const isSelected = useCallback((tid) => selectedTids.has(tid), [selectedTids]);
+  const isAllSelected = processedResults.length > 0 && selectedTids.size === processedResults.length;
+  const isSomeSelected = selectedTids.size > 0 && selectedTids.size < processedResults.length;
+
+  // Bulk delete handler
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedTids.size === 0) return;
+
+    const deletePromises = Array.from(selectedTids).map((tid) =>
+      fetch(`${process.env.REACT_APP_REST_API_URL}/optimization/results/${tid}`, {
+        method: 'DELETE',
+      })
+    );
+
+    await Promise.all(deletePromises);
+    setSelectedTids(new Set());
+    fetchResults();
+  }, [selectedTids, fetchResults]);
+
+  // Bulk compare handler
+  const handleBulkCompare = useCallback(() => {
+    if (selectedTids.size < 2) return;
+    const tids = Array.from(selectedTids).slice(0, 5).join(','); // Max 5
+    navigate(`/compare?tids=${tids}`);
+  }, [selectedTids, navigate]);
+
   // Show initial empty state if no results at all
   if (results.length === 0) {
     return (
@@ -316,23 +386,95 @@ export default function OptimizationResults() {
             flexDirection: 'column',
           }}
         >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
             <Title>Results</Title>
-            <Autocomplete
-              value={strategyFilter}
-              onChange={handleStrategyFilterChange}
-              options={strategyOptions}
-              sx={{ width: 250 }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Filter by Strategy"
-                  size="small"
-                  placeholder="All strategies"
-                />
-              )}
-            />
+            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+              <Autocomplete
+                value={statusFilter}
+                onChange={handleStatusFilterChange}
+                options={STATUS_OPTIONS}
+                sx={{ width: 150 }}
+                disableClearable
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Status"
+                    size="small"
+                  />
+                )}
+              />
+              <Autocomplete
+                value={strategyFilter}
+                onChange={handleStrategyFilterChange}
+                options={strategyOptions}
+                sx={{ width: 220 }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Strategy"
+                    size="small"
+                    placeholder="All"
+                  />
+                )}
+              />
+            </Box>
           </Box>
+
+          {/* Floating Action Bar */}
+          <Fade in={selectedTids.size > 0}>
+            <Box
+              sx={{
+                display: selectedTids.size > 0 ? 'flex' : 'none',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                mb: 2,
+                p: 1.5,
+                backgroundColor: 'rgba(251, 191, 36, 0.1)',
+                border: '1px solid',
+                borderColor: 'primary.main',
+                borderRadius: 2,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Chip
+                  label={`${selectedTids.size} selected`}
+                  color="primary"
+                  size="small"
+                  sx={{ fontWeight: 600 }}
+                />
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<CompareArrowsIcon />}
+                  onClick={handleBulkCompare}
+                  disabled={selectedTids.size < 2}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Compare{selectedTids.size > 5 ? ' (max 5)' : ''}
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={handleBulkDelete}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Delete Selected
+                </Button>
+                <Button
+                  size="small"
+                  variant="text"
+                  onClick={() => setSelectedTids(new Set())}
+                  sx={{ textTransform: 'none' }}
+                >
+                  Clear
+                </Button>
+              </Box>
+            </Box>
+          </Fade>
 
           {processedResults.length === 0 ? (
             <EmptyState
@@ -349,8 +491,16 @@ export default function OptimizationResults() {
                   <TableHead>
                     <TableRow>
                       {columns.map((column) => (
-                        <TableCell key={column.id}>
-                          {column.sortable ? (
+                        <TableCell key={column.id} sx={column.width ? { width: column.width } : {}}>
+                          {column.id === 'checkbox' ? (
+                            <Checkbox
+                              indeterminate={isSomeSelected}
+                              checked={isAllSelected}
+                              onChange={handleSelectAll}
+                              size="small"
+                              sx={{ p: 0 }}
+                            />
+                          ) : column.sortable ? (
                             <TableSortLabel
                               active={orderBy === column.id}
                               direction={orderBy === column.id ? order : 'asc'}
@@ -366,37 +516,60 @@ export default function OptimizationResults() {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {paginatedResults.map((row) => (
-                      <TableRow key={row['tid']} hover>
-                        <TableCell>{row['test_name']}</TableCell>
-                        <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row['creation_time'])}</TableCell>
-                        <TableCell>{row['strategy']}</TableCell>
-                        <TableCell>{row['provider']}</TableCell>
-                        <TableCell>{row['symbol']}</TableCell>
-                        <TableCell>{row['timeframe']}</TableCell>
-                        <TableCell sx={{ fontFamily: '"IBM Plex Mono", monospace' }}>
-                          {formatSharpe(row['sharpe'])}
-                        </TableCell>
-                        <TableCell>
-                          <StatusChip status={row['status']} />
-                        </TableCell>
-                        <TableCell>
-                          <PerformedTests rowElement={row['optimizations']} />
-                        </TableCell>
-                        <TableCell>
-                          <Tooltip title="View Details" arrow>
-                            <IconButton onClick={() => handleComparePage(row['tid'])}>
-                              <ViewListIcon />
-                            </IconButton>
-                          </Tooltip>
-                          <Tooltip title="Delete" arrow>
-                            <IconButton onClick={() => handleDeleteOptResult(row['tid'])}>
-                              <DeleteIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {paginatedResults.map((row) => {
+                      const isRowSelected = isSelected(row['tid']);
+                      return (
+                        <TableRow
+                          key={row['tid']}
+                          hover
+                          selected={isRowSelected}
+                          sx={{
+                            '&.Mui-selected': {
+                              backgroundColor: 'rgba(251, 191, 36, 0.08)',
+                            },
+                            '&.Mui-selected:hover': {
+                              backgroundColor: 'rgba(251, 191, 36, 0.12)',
+                            },
+                          }}
+                        >
+                          <TableCell sx={{ width: 50 }}>
+                            <Checkbox
+                              checked={isRowSelected}
+                              onChange={() => handleSelectOne(row['tid'])}
+                              size="small"
+                              sx={{ p: 0 }}
+                            />
+                          </TableCell>
+                          <TableCell>{row['test_name']}</TableCell>
+                          <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(row['creation_time'])}</TableCell>
+                          <TableCell>{row['strategy']}</TableCell>
+                          <TableCell>{row['provider']}</TableCell>
+                          <TableCell>{row['symbol']}</TableCell>
+                          <TableCell>{row['timeframe']}</TableCell>
+                          <TableCell sx={{ fontFamily: '"IBM Plex Mono", monospace' }}>
+                            {formatSharpe(row['sharpe'])}
+                          </TableCell>
+                          <TableCell>
+                            <StatusChip status={row['status']} />
+                          </TableCell>
+                          <TableCell>
+                            <PerformedTests rowElement={row['optimizations']} />
+                          </TableCell>
+                          <TableCell>
+                            <Tooltip title="View Details" arrow>
+                              <IconButton onClick={() => handleComparePage(row['tid'])}>
+                                <ViewListIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Delete" arrow>
+                              <IconButton onClick={() => handleDeleteOptResult(row['tid'])}>
+                                <DeleteIcon />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>
