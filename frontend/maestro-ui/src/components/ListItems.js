@@ -9,6 +9,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import AssessmentIcon from '@mui/icons-material/Assessment';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import StorageIcon from '@mui/icons-material/Storage';
 
 export default function MainListItems() {
   const navigate = useNavigate();
@@ -20,6 +21,7 @@ export default function MainListItems() {
     { path: '/results', label: 'Results', icon: <AssessmentIcon /> },
     { path: '/evaluate', label: 'Evaluation', icon: <TrendingUpIcon /> },
     { path: '/compare', label: 'Compare', icon: <CompareArrowsIcon /> },
+    { path: '/data', label: 'Data', icon: <StorageIcon /> },
   ];
 
   return (

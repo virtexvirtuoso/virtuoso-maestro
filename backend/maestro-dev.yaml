@@ -14,6 +14,118 @@ config:
             - 1d
     binance:
       symbols:
+        # === MAJOR PAIRS ===
+        btcusdt:
+          bin_size:
+            - 1m
+            - 5m
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        ethusdt:
+          bin_size:
+            - 1m
+            - 5m
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        solusdt:
+          bin_size:
+            - 1m
+            - 5m
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        # === TOP PERFORMERS (verified on Binance) ===
+        cgptusdt:  # ChainGPT - AI sector leader
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        zecusdt:  # Zcash - Privacy
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        sentusdt:  # Sentinel - Privacy/VPN
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        cocosusdt:  # Cocos-BCX - Gaming
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        # === HIGH-CAP ALTCOINS ===
+        renderusdt:  # AI/GPU
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        fetusdt:  # AI
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        taousdt:  # AI
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        arbusdt:  # L2
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        opusdt:  # L2
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        suiusdt:  # L1
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        tiausdt:  # Modular/DA
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        injusdt:  # DeFi
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        linkusdt:  # Oracle
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        avaxusdt:  # L1
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        # === LEGACY PAIRS ===
         ethbtc:
           bin_size:
             - 1d
@@ -31,6 +143,78 @@ config:
             - 1d
         iostbtc:
           bin_size:
+            - 1d
+    # === BYBIT (Perps for funding rate strategies) ===
+    bybit:
+      symbols:
+        myxusdt:  # MYX - Top performer (perp only)
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        riverusdt:  # RIVER - Top performer (perp only)
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+    # === GATE.IO ===
+    gate:
+      symbols:
+        myxusdt:  # MYX - Spot
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+    # === KUCOIN ===
+    kucoin:
+      symbols:
+        rainusdt:  # RAIN - Top performer
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        adiusdt:  # ADI - Top performer
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+    # === MEXC (most altcoins available) ===
+    mexc:
+      symbols:
+        myxusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        rainusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        dstusdt:  # DST - Top performer
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        riverusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        cocousdt:  # COCO - Top performer
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
             - 1d
   restapi:
     host: 127.0.0.1

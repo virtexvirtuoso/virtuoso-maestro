@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maestro - Empty State (First Visit)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            maestro: {
+              gold: '#fbbf24',
+              dark: '#0a0a0a',
+              darker: '#050505',
+              border: '#1a1a1a',
+              text: '#e5e5e5',
+              muted: '#737373'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'IBM Plex Mono', monospace; }
+    .glow-gold { text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
+    .pulse-border {
+      animation: pulseBorder 2s ease-in-out infinite;
+    }
+    @keyframes pulseBorder {
+      0%, 100% { border-color: rgba(251, 191, 36, 0.3); }
+      50% { border-color: rgba(251, 191, 36, 0.6); }
+    }
+  </style>
+</head>
+<body class="bg-maestro-darker text-maestro-text min-h-screen">
+
+  <!-- Top Navigation -->
+  <header class="bg-maestro-dark border-b border-maestro-border sticky top-0 z-50">
+    <div class="flex items-center justify-between px-6 py-3">
+      <h1 class="text-xl font-bold text-maestro-gold glow-gold tracking-wider">MAESTRO</h1>
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2 text-sm">
+          <span class="w-2 h-2 bg-yellow-500 rounded-full"></span>
+          <span class="text-maestro-muted">No Data</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex">
+    <!-- Sidebar -->
+    <aside class="w-52 bg-maestro-dark border-r border-maestro-border min-h-[calc(100vh-57px)] p-4">
+      <nav class="space-y-1">
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 bg-maestro-gold/10 border border-maestro-gold/30 text-maestro-gold rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+          </svg>
+          Home
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-maestro-muted/50 rounded-lg cursor-not-allowed">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+          Results
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-maestro-muted/50 rounded-lg cursor-not-allowed">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+          </svg>
+          Evaluation
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-maestro-muted/50 rounded-lg cursor-not-allowed">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+          </svg>
+          Compare
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-maestro-gold hover:bg-maestro-gold/10 rounded-lg transition-colors pulse-border border border-transparent">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+          </svg>
+          Data
+          <span class="ml-auto text-xs bg-maestro-gold text-black px-1.5 py-0.5 rounded">Start</span>
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main Content - Empty State -->
+    <main class="flex-1 flex items-center justify-center p-8">
+      <div class="max-w-2xl w-full">
+
+        <!-- Welcome Card -->
+        <div class="bg-maestro-dark border border-maestro-border rounded-2xl p-10 text-center">
+
+          <!-- Icon -->
+          <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-maestro-gold/10 border border-maestro-gold/30 flex items-center justify-center">
+            <svg class="w-10 h-10 text-maestro-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+            </svg>
+          </div>
+
+          <!-- Title & Description -->
+          <h2 class="text-2xl font-bold text-maestro-text mb-3">Welcome to Maestro</h2>
+          <p class="text-maestro-muted mb-8 max-w-md mx-auto leading-relaxed">
+            Walk-Forward Optimization Engine for quantitative trading strategy research.
+            Validate your strategies before risking capital.
+          </p>
+
+          <!-- CTA -->
+          <a href="#" class="inline-flex items-center gap-2 bg-maestro-gold text-black px-6 py-3 rounded-lg font-semibold hover:bg-yellow-400 transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+            </svg>
+            Go to Data Management
+          </a>
+
+          <!-- Divider -->
+          <div class="my-8 border-t border-maestro-border"></div>
+
+          <!-- Quick Start Steps -->
+          <div class="text-left">
+            <h3 class="text-sm font-semibold text-maestro-text mb-4 uppercase tracking-wider">Quick Start Guide</h3>
+            <div class="space-y-4">
+              <div class="flex items-start gap-4">
+                <div class="w-8 h-8 rounded-full bg-maestro-gold/10 border border-maestro-gold/30 flex items-center justify-center text-maestro-gold font-semibold text-sm shrink-0">1</div>
+                <div>
+                  <h4 class="font-medium text-maestro-text">Download Historical Data</h4>
+                  <p class="text-sm text-maestro-muted">Connect to Binance or BitMEX and download OHLCV data for your target symbols.</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-4">
+                <div class="w-8 h-8 rounded-full bg-maestro-border flex items-center justify-center text-maestro-muted font-semibold text-sm shrink-0">2</div>
+                <div>
+                  <h4 class="font-medium text-maestro-muted">Configure Optimization Test</h4>
+                  <p class="text-sm text-maestro-muted/70">Select a strategy, set parameters, and choose between backtesting or walk-forward optimization.</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-4">
+                <div class="w-8 h-8 rounded-full bg-maestro-border flex items-center justify-center text-maestro-muted font-semibold text-sm shrink-0">3</div>
+                <div>
+                  <h4 class="font-medium text-maestro-muted">Analyze Results</h4>
+                  <p class="text-sm text-maestro-muted/70">Review performance metrics, parameter stability, and walk-forward validation results.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Info Cards -->
+        <div class="grid grid-cols-2 gap-4 mt-6">
+          <div class="bg-maestro-dark border border-maestro-border rounded-xl p-5">
+            <div class="flex items-center gap-3 mb-2">
+              <div class="w-8 h-8 bg-green-500/10 rounded-lg flex items-center justify-center">
+                <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+              </div>
+              <h4 class="font-medium text-maestro-text">Walk-Forward Validation</h4>
+            </div>
+            <p class="text-sm text-maestro-muted">Prevent overfitting with rolling time-series validation across multiple train/test periods.</p>
+          </div>
+          <div class="bg-maestro-dark border border-maestro-border rounded-xl p-5">
+            <div class="flex items-center gap-3 mb-2">
+              <div class="w-8 h-8 bg-blue-500/10 rounded-lg flex items-center justify-center">
+                <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/>
+                </svg>
+              </div>
+              <h4 class="font-medium text-maestro-text">11 Built-in Strategies</h4>
+            </div>
+            <p class="text-sm text-maestro-muted">EMA Cross, RSI, Bollinger, MACD, Ichimoku, and more. Or import your own custom strategies.</p>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+</body>
+</html>

@@ -99,6 +99,52 @@ Configuration files:
 - `backend/maestro-dev.yaml`: Development configuration
 - `backend/maestro-prd.yaml`: Production configuration
 
+## Research Module (NEW)
+
+Automated strategy research system for cross-asset, cross-timeframe analysis.
+
+### Quick Start
+
+```bash
+# Activate virtual environment
+source .venv/bin/activate
+
+# Run research
+python -m backend.research.cli run \
+  --strategies BollingerBreakout MACD RSI \
+  --assets BTC/USDT ETH/USDT SOL/USDT \
+  --timeframes 1h 4h 1d
+```
+
+### Features
+
+- **Grid Backtesting**: Test strategies across multiple assets and timeframes
+- **Hybrid Strategies**: Auto-generate strategy combinations (e.g., MACD + VolumeFilter)
+- **Pattern Analysis**: Identify what works vs what doesn't
+- **Cross-Asset Tables**: Performance comparison matrices
+
+### Built-in Strategies
+
+| Category | Strategies |
+|----------|------------|
+| Trend Following | MACD, EMA_Cross, SMA_Cross, Momentum |
+| Mean Reversion | RSI, BollingerBreakout, MeanReversion |
+| Volume Based | OBV, VolumeBreakout, CapitulationReversal |
+
+### Sample Output
+
+```
+📊 BollingerBreakout
+------------------------------------------------------------
+Asset/TF                 Return %     Sharpe    MaxDD %   Trades
+------------------------------------------------------------
+BTC/USDT/1d              +81.52%     1.0996    -44.48%       12
+ETH/USDT/1d             +104.40%     1.1104    -31.93%        9
+SOL/USDT/1d             +348.35%     1.2500    -27.00%       10
+```
+
+See `backend/research/README.md` for full documentation.
+
 ## API Endpoints
 
 The REST API provides endpoints for:

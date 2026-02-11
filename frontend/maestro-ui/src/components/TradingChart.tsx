@@ -58,38 +58,38 @@ export interface TradingChartProps {
   title?: string;
 }
 
-// Dark theme configuration matching the app's MUI theme
+// Dark theme configuration matching the app's MUI dark theme with gold accent
 const DARK_THEME = {
   layout: {
-    background: { type: ColorType.Solid, color: '#1e1e1e' },
-    textColor: '#d1d4dc',
+    background: { type: ColorType.Solid, color: '#121212' },
+    textColor: '#e0e0e0',
   },
   grid: {
-    vertLines: { color: '#2B2B43' },
-    horzLines: { color: '#2B2B43' },
+    vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
+    horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
   },
   crosshair: {
     mode: CrosshairMode.Normal,
     vertLine: {
       width: 1 as LineWidth,
-      color: '#758696',
+      color: '#fbbf24',
       style: LineStyle.Dashed,
       labelBackgroundColor: '#1e1e1e',
     },
     horzLine: {
       width: 1 as LineWidth,
-      color: '#758696',
+      color: '#fbbf24',
       style: LineStyle.Dashed,
       labelBackgroundColor: '#1e1e1e',
     },
   },
   timeScale: {
-    borderColor: '#2B2B43',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
     timeVisible: true,
     secondsVisible: false,
   },
   rightPriceScale: {
-    borderColor: '#2B2B43',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
 };
 

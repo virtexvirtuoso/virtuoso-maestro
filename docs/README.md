@@ -13,6 +13,16 @@
 | [Walk-Forward Guide](guides/walk-forward-analysis.md) | WFA methodology and time series splits |
 | [Branding](project/BRANDING.md) | Logo, colors, naming conventions |
 
+### Data & Research
+
+| Document | Description |
+|----------|-------------|
+| [Data Inventory](DATA_INVENTORY.md) | Available OHLCV, funding, OI data sources |
+| [Strategies Roadmap](STRATEGIES_ROADMAP.md) | 30 strategies across 3 phases |
+| [Open Interest Data](OPEN_INTEREST_DATA.md) | **Free OI sources + why proxies don't work** |
+| [Synthetic Proxies](SYNTHETIC_PROXIES.md) | Funding/liquidation proxy methods (validated) |
+| [Quant Problem Summary](QUANT_PROBLEM_SUMMARY.md) | Research problem + action plan |
+
 ---
 
 ## Directory Structure

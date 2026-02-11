@@ -1,6 +1,6 @@
 // OptimizationWizard - 4-step wizard modal for new optimizations
 // Uses progressive disclosure to reduce cognitive load
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -34,6 +34,8 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
@@ -75,15 +77,15 @@ const OPTIMIZATION_TYPE_LABELS = {
   BOTH: 'Both',
 };
 
-export default function OptimizationWizard({ open, onClose }) {
+export default function OptimizationWizard({ open, onClose, initialPreset }) {
   const { notify } = useNotification();
 
   // Wizard state
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Form data
-  const [formData, setFormData] = useState({
+  // Default form state
+  const defaultFormData = {
     // Step 1: Data Source
     provider: '',
     symbol: '',
@@ -101,7 +103,31 @@ export default function OptimizationWizard({ open, onClose }) {
     wfoMode: 'rolling',
     // Step 4: Review
     testName: '',
-  });
+  };
+
+  // Form data - merge with preset if provided
+  const [formData, setFormData] = useState(defaultFormData);
+
+  // Apply preset when it changes
+  useEffect(() => {
+    if (initialPreset && open) {
+      const presetConfig = initialPreset.config;
+      setFormData((prev) => ({
+        ...prev,
+        provider: presetConfig.provider || prev.provider,
+        symbol: presetConfig.symbol || prev.symbol,
+        binSize: presetConfig.binSize || prev.binSize,
+        strategy: presetConfig.strategy || prev.strategy,
+        strategyParams: presetConfig.strategyParams || prev.strategyParams,
+        optType: presetConfig.optType || prev.optType,
+        wfoSplits: presetConfig.wfoSplits || prev.wfoSplits,
+        wfoMode: presetConfig.wfoMode || prev.wfoMode,
+        testName: `${presetConfig.strategy}_${presetConfig.symbol}_${new Date().toISOString().slice(0, 10)}`,
+      }));
+      // Skip to review step for presets
+      setCurrentStep(3);
+    }
+  }, [initialPreset, open]);
 
   // Data loading states
   const [providers, setProviders] = useState([]);
@@ -110,6 +136,10 @@ export default function OptimizationWizard({ open, onClose }) {
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [loadingSymbols, setLoadingSymbols] = useState(false);
   const [loadingStrategies, setLoadingStrategies] = useState(true);
+
+  // Data availability validation
+  const [dataAvailability, setDataAvailability] = useState(null);
+  const [loadingDataAvailability, setLoadingDataAvailability] = useState(false);
 
 
   // Fetch providers on mount
@@ -165,6 +195,40 @@ export default function OptimizationWizard({ open, onClose }) {
       });
   }, [notify]);
 
+  // Fetch data availability when provider/symbol/binSize are set
+  const fetchDataAvailability = useCallback((provider, symbol, binSize) => {
+    if (!provider || !symbol || !binSize) {
+      setDataAvailability(null);
+      return;
+    }
+    setLoadingDataAvailability(true);
+    fetch(`${process.env.REACT_APP_REST_API_URL}/datasource/${provider}/${symbol}/${binSize}/range`)
+      .then((res) => {
+        if (!res.ok) throw new Error('Range endpoint not available');
+        return res.json();
+      })
+      .then((data) => {
+        setDataAvailability({
+          start: new Date(data.start_date || data.start),
+          end: new Date(data.end_date || data.end),
+          count: data.count || data.records,
+        });
+        setLoadingDataAvailability(false);
+      })
+      .catch(() => {
+        // Endpoint may not exist yet - fail silently
+        setDataAvailability(null);
+        setLoadingDataAvailability(false);
+      });
+  }, []);
+
+  // Trigger data availability check when data source params change
+  useEffect(() => {
+    if (formData.provider && formData.symbol && formData.binSize) {
+      fetchDataAvailability(formData.provider, formData.symbol, formData.binSize);
+    }
+  }, [formData.provider, formData.symbol, formData.binSize, fetchDataAvailability]);
+
   // Fetch strategy params when strategy changes (for initial values)
   const fetchStrategyParams = useCallback((strategy) => {
     if (!strategy) {
@@ -208,10 +272,49 @@ export default function OptimizationWizard({ open, onClose }) {
     }));
   };
 
+  // Calculate data range validation warnings
+  const dataRangeValidation = useMemo(() => {
+    if (!dataAvailability) return { hasWarning: false, hasError: false };
+
+    const selectedStart = formData.startDate.getTime();
+    const selectedEnd = formData.endDate.getTime();
+    const availableStart = dataAvailability.start.getTime();
+    const availableEnd = dataAvailability.end.getTime();
+
+    // Check for no overlap (error)
+    if (selectedEnd < availableStart || selectedStart > availableEnd) {
+      return {
+        hasWarning: false,
+        hasError: true,
+        message: 'Selected date range has no data. Adjust your dates.',
+      };
+    }
+
+    // Check for partial overlap (warning)
+    const warnings = [];
+    if (selectedStart < availableStart) {
+      warnings.push(`Data starts ${dataAvailability.start.toLocaleDateString()}`);
+    }
+    if (selectedEnd > availableEnd) {
+      warnings.push(`Data ends ${dataAvailability.end.toLocaleDateString()}`);
+    }
+
+    if (warnings.length > 0) {
+      return {
+        hasWarning: true,
+        hasError: false,
+        message: warnings.join('. ') + '. Selected range will be clipped.',
+      };
+    }
+
+    return { hasWarning: false, hasError: false };
+  }, [dataAvailability, formData.startDate, formData.endDate]);
+
   // Validation per step
   const isStepValid = (step) => {
     switch (step) {
       case 0: // Data Source
+        // Don't block on validation error - let backend handle it
         return formData.provider && formData.symbol && formData.binSize;
       case 1: // Strategy
         return formData.strategy;
@@ -286,19 +389,9 @@ export default function OptimizationWizard({ open, onClose }) {
   const handleClose = () => {
     setCurrentStep(0);
     setFormData({
-      provider: '',
-      symbol: '',
-      binSize: '1d',
+      ...defaultFormData,
       startDate: new Date(2020, 0, 1),
       endDate: new Date(),
-      strategy: '',
-      strategyParams: {},
-      optType: 'BACKTESTING',
-      cash: 10000,
-      commissions: 0.1,
-      wfoSplits: 10,
-      wfoMode: 'rolling',
-      testName: '',
     });
     setSymbols([]);
     onClose();
@@ -443,6 +536,53 @@ export default function OptimizationWizard({ open, onClose }) {
             />
           </Grid>
         </Grid>
+
+        {/* Data Availability Indicator */}
+        {formData.provider && formData.symbol && formData.binSize && (
+          <Box sx={{ mt: 2 }}>
+            {loadingDataAvailability ? (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <CircularProgress size={16} />
+                <Typography variant="body2" color="text.secondary">
+                  Checking data availability...
+                </Typography>
+              </Box>
+            ) : dataAvailability ? (
+              <Box>
+                {/* Available data range info */}
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    p: 1.5,
+                    bgcolor: 'action.hover',
+                    borderRadius: 1,
+                    mb: dataRangeValidation.hasWarning || dataRangeValidation.hasError ? 1 : 0,
+                  }}
+                >
+                  <InfoOutlinedIcon sx={{ fontSize: 18, color: 'info.main' }} />
+                  <Typography variant="body2" color="text.secondary">
+                    Available data: {dataAvailability.start.toLocaleDateString()} -{' '}
+                    {dataAvailability.end.toLocaleDateString()}
+                    {dataAvailability.count && ` (${dataAvailability.count.toLocaleString()} records)`}
+                  </Typography>
+                </Box>
+
+                {/* Warning or Error */}
+                {(dataRangeValidation.hasWarning || dataRangeValidation.hasError) && (
+                  <Alert
+                    severity={dataRangeValidation.hasError ? 'error' : 'warning'}
+                    icon={<WarningAmberIcon />}
+                    sx={{ py: 0.5 }}
+                  >
+                    {dataRangeValidation.message}
+                  </Alert>
+                )}
+              </Box>
+            ) : null}
+          </Box>
+        )}
       </Box>
     </LocalizationProvider>
   );

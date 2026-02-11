@@ -20,65 +20,207 @@ config:
             - 1d
     binance:
       symbols:
-        ethbtc:
-          bin_size:
-            - 1m
-            - 5m
-            - 1h
-            - 1d
-        ltcbtc:
-          bin_size:
-            - 1m
-            - 5m
-            - 1h
-            - 1d
-        zecbtc:
-          bin_size:
-            - 1m
-            - 5m
-            - 1h
-            - 1d
-        bnbbtc:
-          bin_size:
-            - 1m
-            - 5m
-            - 1h
-            - 1d
-        xrpbtc:
-          bin_size:
-            - 1m
-            - 5m
-            - 1h
-            - 1d
-        eosbtc:
-          bin_size:
-            - 1m
-            - 5m
-            - 1h
-            - 1d
-        xmrbtc:
-          bin_size:
-            - 1m
-            - 5m
-            - 1h
-            - 1d
-        chzbtc:
-          bin_size:
-            - 1m
-            - 5m
-            - 1h
-            - 1d
-        linkbtc:
-          bin_size:
-            - 1m
-            - 5m
-            - 1h
-            - 1d
+        # === MAJOR PAIRS ===
         btcusdt:
           bin_size:
             - 1m
             - 5m
+            - 15m
             - 1h
+            - 4h
+            - 1d
+        ethusdt:
+          bin_size:
+            - 1m
+            - 5m
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        solusdt:
+          bin_size:
+            - 1m
+            - 5m
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        # === TOP PERFORMERS (verified on Binance) ===
+        cgptusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        zecusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        sentusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        cocosusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        # === HIGH-CAP ALTCOINS ===
+        renderusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        fetusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        taousdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        arbusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        opusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        suiusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        tiausdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        injusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        linkusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        avaxusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        # === LEGACY BTC PAIRS ===
+        ethbtc:
+          bin_size:
+            - 1d
+        ltcbtc:
+          bin_size:
+            - 1d
+        zecbtc:
+          bin_size:
+            - 1d
+        bnbbtc:
+          bin_size:
+            - 1d
+        xrpbtc:
+          bin_size:
+            - 1d
+        linkbtc:
+          bin_size:
+            - 1d
+    # === BYBIT (Perps for funding rate strategies) ===
+    bybit:
+      symbols:
+        myxusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        riverusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+    # === GATE.IO ===
+    gate:
+      symbols:
+        myxusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+    # === KUCOIN ===
+    kucoin:
+      symbols:
+        rainusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        adiusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+    # === MEXC ===
+    mexc:
+      symbols:
+        myxusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        rainusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        dstusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        riverusdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
+            - 1d
+        cocousdt:
+          bin_size:
+            - 15m
+            - 1h
+            - 4h
             - 1d
   restapi:
     host: 0.0.0.0

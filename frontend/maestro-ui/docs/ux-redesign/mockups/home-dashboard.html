@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maestro - Walk-Forward Optimization Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            maestro: {
+              gold: '#fbbf24',
+              dark: '#0a0a0a',
+              darker: '#050505',
+              border: '#1a1a1a',
+              text: '#e5e5e5',
+              muted: '#737373'
+            }
+          },
+          fontFamily: {
+            mono: ['"IBM Plex Mono"', 'monospace'],
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'IBM Plex Mono', monospace; }
+    .glow-gold { text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
+    .card-glow:hover { box-shadow: 0 0 20px rgba(251, 191, 36, 0.1); }
+  </style>
+</head>
+<body class="bg-maestro-darker text-maestro-text min-h-screen">
+
+  <!-- Top Navigation -->
+  <header class="bg-maestro-dark border-b border-maestro-border sticky top-0 z-50">
+    <div class="flex items-center justify-between px-6 py-3">
+      <div class="flex items-center gap-8">
+        <h1 class="text-xl font-bold text-maestro-gold glow-gold tracking-wider">MAESTRO</h1>
+      </div>
+      <div class="flex items-center gap-4">
+        <button class="flex items-center gap-2 bg-maestro-gold text-black px-4 py-2 rounded-lg font-medium hover:bg-yellow-400 transition-colors">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          New Test
+        </button>
+        <button class="relative p-2 text-maestro-muted hover:text-maestro-text">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+          </svg>
+          <span class="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full"></span>
+        </button>
+        <div class="flex items-center gap-2 text-sm">
+          <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          <span class="text-maestro-muted">API Connected</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="flex">
+    <!-- Sidebar -->
+    <aside class="w-52 bg-maestro-dark border-r border-maestro-border min-h-[calc(100vh-57px)] p-4">
+      <nav class="space-y-1">
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 bg-maestro-gold/10 border border-maestro-gold/30 text-maestro-gold rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+          </svg>
+          Home
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-maestro-muted hover:text-maestro-text hover:bg-maestro-border/50 rounded-lg transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+          </svg>
+          Results
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-maestro-muted hover:text-maestro-text hover:bg-maestro-border/50 rounded-lg transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+          </svg>
+          Evaluation
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-maestro-muted hover:text-maestro-text hover:bg-maestro-border/50 rounded-lg transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+          </svg>
+          Compare
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 text-maestro-muted hover:text-maestro-text hover:bg-maestro-border/50 rounded-lg transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+          </svg>
+          Data
+        </a>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 p-6">
+      <!-- Data Sources Section -->
+      <section class="mb-8">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-maestro-text">Available Data Sources</h2>
+          <button class="text-maestro-muted hover:text-maestro-text flex items-center gap-1 text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            Refresh
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <!-- Binance Card -->
+          <div class="bg-maestro-dark border border-maestro-border rounded-xl p-5 card-glow transition-all hover:border-maestro-gold/30">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-yellow-500/10 rounded-lg flex items-center justify-center">
+                  <span class="text-yellow-500 font-bold text-sm">B</span>
+                </div>
+                <div>
+                  <h3 class="font-semibold text-maestro-text">Binance</h3>
+                  <span class="text-xs text-green-500">4 symbols</span>
+                </div>
+              </div>
+              <button class="text-maestro-muted hover:text-maestro-gold text-sm">+ Add</button>
+            </div>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-sm py-1.5 px-3 bg-maestro-darker rounded-lg">
+                <span class="font-medium">BTCUSDT</span>
+                <div class="flex gap-1">
+                  <span class="px-1.5 py-0.5 bg-maestro-border rounded text-xs text-maestro-muted">1d</span>
+                  <span class="px-1.5 py-0.5 bg-maestro-border rounded text-xs text-maestro-muted">1h</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-sm py-1.5 px-3 bg-maestro-darker rounded-lg">
+                <span class="font-medium">ETHUSDT</span>
+                <div class="flex gap-1">
+                  <span class="px-1.5 py-0.5 bg-maestro-border rounded text-xs text-maestro-muted">1d</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-sm py-1.5 px-3 bg-maestro-darker rounded-lg">
+                <span class="font-medium">SOLUSDT</span>
+                <div class="flex gap-1">
+                  <span class="px-1.5 py-0.5 bg-maestro-border rounded text-xs text-maestro-muted">1d</span>
+                  <span class="px-1.5 py-0.5 bg-maestro-border rounded text-xs text-maestro-muted">1h</span>
+                  <span class="px-1.5 py-0.5 bg-maestro-border rounded text-xs text-maestro-muted">5m</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BitMEX Card -->
+          <div class="bg-maestro-dark border border-maestro-border rounded-xl p-5 card-glow transition-all hover:border-maestro-gold/30">
+            <div class="flex items-center justify-between mb-4">
+              <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-red-500/10 rounded-lg flex items-center justify-center">
+                  <span class="text-red-500 font-bold text-sm">M</span>
+                </div>
+                <div>
+                  <h3 class="font-semibold text-maestro-text">BitMEX</h3>
+                  <span class="text-xs text-green-500">2 symbols</span>
+                </div>
+              </div>
+              <button class="text-maestro-muted hover:text-maestro-gold text-sm">+ Add</button>
+            </div>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between text-sm py-1.5 px-3 bg-maestro-darker rounded-lg">
+                <span class="font-medium">XBTUSD</span>
+                <div class="flex gap-1">
+                  <span class="px-1.5 py-0.5 bg-maestro-border rounded text-xs text-maestro-muted">1d</span>
+                  <span class="px-1.5 py-0.5 bg-maestro-border rounded text-xs text-maestro-muted">1h</span>
+                  <span class="px-1.5 py-0.5 bg-maestro-border rounded text-xs text-maestro-muted">5m</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-sm py-1.5 px-3 bg-maestro-darker rounded-lg">
+                <span class="font-medium">ETHUSD</span>
+                <div class="flex gap-1">
+                  <span class="px-1.5 py-0.5 bg-maestro-border rounded text-xs text-maestro-muted">1d</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Add New Provider Card -->
+          <div class="bg-maestro-dark border border-dashed border-maestro-border rounded-xl p-5 flex flex-col items-center justify-center text-center hover:border-maestro-gold/30 cursor-pointer transition-all min-h-[180px]">
+            <div class="w-12 h-12 bg-maestro-border rounded-full flex items-center justify-center mb-3">
+              <svg class="w-6 h-6 text-maestro-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+              </svg>
+            </div>
+            <span class="text-maestro-muted text-sm">Add Data Source</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Recent Optimizations Section -->
+      <section>
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-maestro-text">Recent Optimizations</h2>
+          <a href="#" class="text-maestro-gold hover:text-yellow-400 text-sm">View All Results</a>
+        </div>
+
+        <div class="bg-maestro-dark border border-maestro-border rounded-xl overflow-hidden">
+          <table class="w-full">
+            <thead class="bg-maestro-darker">
+              <tr class="text-left text-sm text-maestro-muted">
+                <th class="px-5 py-3 font-medium">Name</th>
+                <th class="px-5 py-3 font-medium">Strategy</th>
+                <th class="px-5 py-3 font-medium">Symbol</th>
+                <th class="px-5 py-3 font-medium">Type</th>
+                <th class="px-5 py-3 font-medium">Status</th>
+                <th class="px-5 py-3 font-medium">Sharpe</th>
+                <th class="px-5 py-3 font-medium">Date</th>
+                <th class="px-5 py-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-maestro-border">
+              <!-- Running optimization -->
+              <tr class="hover:bg-maestro-darker/50 transition-colors">
+                <td class="px-5 py-4">
+                  <span class="font-medium">RSI Momentum Test</span>
+                </td>
+                <td class="px-5 py-4 text-maestro-muted">RSI</td>
+                <td class="px-5 py-4">
+                  <span class="px-2 py-1 bg-yellow-500/10 text-yellow-500 rounded text-sm">BTCUSDT</span>
+                </td>
+                <td class="px-5 py-4 text-maestro-muted text-sm">Walk-Forward</td>
+                <td class="px-5 py-4">
+                  <div class="flex items-center gap-2">
+                    <div class="w-20 h-1.5 bg-maestro-border rounded-full overflow-hidden">
+                      <div class="w-[45%] h-full bg-maestro-gold rounded-full animate-pulse"></div>
+                    </div>
+                    <span class="text-maestro-gold text-sm">45%</span>
+                  </div>
+                </td>
+                <td class="px-5 py-4 text-maestro-muted">--</td>
+                <td class="px-5 py-4 text-maestro-muted text-sm">now</td>
+                <td class="px-5 py-4">
+                  <button class="text-red-400 hover:text-red-300 text-sm">Stop</button>
+                </td>
+              </tr>
+              <!-- Completed optimization -->
+              <tr class="hover:bg-maestro-darker/50 transition-colors">
+                <td class="px-5 py-4">
+                  <span class="font-medium">EMA Cross v2</span>
+                </td>
+                <td class="px-5 py-4 text-maestro-muted">EMA Cross</td>
+                <td class="px-5 py-4">
+                  <span class="px-2 py-1 bg-yellow-500/10 text-yellow-500 rounded text-sm">BTCUSDT</span>
+                </td>
+                <td class="px-5 py-4 text-maestro-muted text-sm">Walk-Forward</td>
+                <td class="px-5 py-4">
+                  <span class="flex items-center gap-1.5 text-green-500 text-sm">
+                    <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Completed
+                  </span>
+                </td>
+                <td class="px-5 py-4">
+                  <span class="text-green-400 font-medium">1.42</span>
+                </td>
+                <td class="px-5 py-4 text-maestro-muted text-sm">2h ago</td>
+                <td class="px-5 py-4">
+                  <button class="text-maestro-gold hover:text-yellow-400 text-sm">View</button>
+                </td>
+              </tr>
+              <!-- Another completed -->
+              <tr class="hover:bg-maestro-darker/50 transition-colors">
+                <td class="px-5 py-4">
+                  <span class="font-medium">Bollinger Breakout</span>
+                </td>
+                <td class="px-5 py-4 text-maestro-muted">Bollinger</td>
+                <td class="px-5 py-4">
+                  <span class="px-2 py-1 bg-red-500/10 text-red-400 rounded text-sm">XBTUSD</span>
+                </td>
+                <td class="px-5 py-4 text-maestro-muted text-sm">Backtest</td>
+                <td class="px-5 py-4">
+                  <span class="flex items-center gap-1.5 text-green-500 text-sm">
+                    <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Completed
+                  </span>
+                </td>
+                <td class="px-5 py-4">
+                  <span class="text-green-400 font-medium">1.15</span>
+                </td>
+                <td class="px-5 py-4 text-maestro-muted text-sm">1d ago</td>
+                <td class="px-5 py-4">
+                  <button class="text-maestro-gold hover:text-yellow-400 text-sm">View</button>
+                </td>
+              </tr>
+              <!-- Failed optimization -->
+              <tr class="hover:bg-maestro-darker/50 transition-colors">
+                <td class="px-5 py-4">
+                  <span class="font-medium">MACD Experiment</span>
+                </td>
+                <td class="px-5 py-4 text-maestro-muted">MACD</td>
+                <td class="px-5 py-4">
+                  <span class="px-2 py-1 bg-yellow-500/10 text-yellow-500 rounded text-sm">ETHUSDT</span>
+                </td>
+                <td class="px-5 py-4 text-maestro-muted text-sm">Walk-Forward</td>
+                <td class="px-5 py-4">
+                  <span class="flex items-center gap-1.5 text-red-400 text-sm">
+                    <span class="w-2 h-2 bg-red-500 rounded-full"></span>
+                    Failed
+                  </span>
+                </td>
+                <td class="px-5 py-4 text-maestro-muted">--</td>
+                <td class="px-5 py-4 text-maestro-muted text-sm">2d ago</td>
+                <td class="px-5 py-4">
+                  <button class="text-maestro-muted hover:text-maestro-text text-sm">Retry</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-maestro-border py-4 px-6 text-center text-maestro-muted text-sm">
+    <span class="text-maestro-gold">&copy;</span> Maestro 2024 - Walk-Forward Optimization Engine
+  </footer>
+
+</body>
+</html>

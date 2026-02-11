@@ -1,5 +1,5 @@
 // Strategy Comparison Dashboard - Side-by-side analysis of multiple strategies
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Grid from '@mui/material/Grid';
 import Paper from '@mui/material/Paper';
@@ -17,9 +17,11 @@ import Typography from '@mui/material/Typography';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import TrendingDownIcon from '@mui/icons-material/TrendingDown';
 import StarIcon from '@mui/icons-material/Star';
+import ShowChartIcon from '@mui/icons-material/ShowChart';
 import Title from './Title';
 import EmptyState from './EmptyState';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import { createChart, ColorType, CrosshairMode, LineStyle } from 'lightweight-charts';
 
 const paperSx = {
   p: 2,
@@ -50,6 +52,181 @@ const STRATEGY_COLORS = [
   '#14b8a6', // teal
   '#a855f7', // purple
 ];
+
+// Dark theme for TradingView charts
+const CHART_THEME = {
+  layout: {
+    background: { type: ColorType.Solid, color: '#121212' },
+    textColor: '#e0e0e0',
+  },
+  grid: {
+    vertLines: { color: 'rgba(255, 255, 255, 0.05)' },
+    horzLines: { color: 'rgba(255, 255, 255, 0.05)' },
+  },
+  crosshair: {
+    mode: CrosshairMode.Normal,
+    vertLine: {
+      width: 1,
+      color: '#fbbf24',
+      style: LineStyle.Dashed,
+      labelBackgroundColor: '#1e1e1e',
+    },
+    horzLine: {
+      width: 1,
+      color: '#fbbf24',
+      style: LineStyle.Dashed,
+      labelBackgroundColor: '#1e1e1e',
+    },
+  },
+  timeScale: {
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    timeVisible: true,
+    secondsVisible: false,
+  },
+  rightPriceScale: {
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+};
+
+// Equity Curve Chart Component
+function EquityCurveChart({ strategies, strategyResults, getColor }) {
+  const chartContainerRef = useRef(null);
+  const chartRef = useRef(null);
+  const seriesRef = useRef([]);
+
+  // Extract equity curve data from results
+  const equityCurves = useMemo(() => {
+    return strategies.map((strategy, index) => {
+      const result = strategyResults[strategy.tid];
+      if (!result) return { tid: strategy.tid, data: [], color: getColor(index) };
+
+      try {
+        const backtesting = result?.optimizations?.BACKTESTING;
+        if (!backtesting || backtesting.length === 0) return { tid: strategy.tid, data: [], color: getColor(index) };
+
+        // Try to get equity curve from pnl data
+        const pnlData = backtesting[0]?.pnl?.data;
+        if (pnlData && Array.isArray(pnlData)) {
+          // Normalize to percentage returns starting at 0%
+          const firstValue = pnlData[0]?.y ?? 0;
+          const data = pnlData.map((point) => ({
+            time: Math.floor(point.x / 1000), // Convert ms to seconds
+            value: firstValue !== 0 ? ((point.y - firstValue) / Math.abs(firstValue)) * 100 : 0,
+          }));
+          return { tid: strategy.tid, name: strategy.test_name, data, color: getColor(index) };
+        }
+
+        // Fallback: try to construct from equity field
+        const equity = backtesting[0]?.equity;
+        if (equity && Array.isArray(equity)) {
+          const firstValue = equity[0]?.value ?? equity[0] ?? 0;
+          const data = equity.map((point, i) => ({
+            time: point.time ?? i,
+            value: firstValue !== 0 ? ((point.value ?? point) - firstValue) / Math.abs(firstValue) * 100 : 0,
+          }));
+          return { tid: strategy.tid, name: strategy.test_name, data, color: getColor(index) };
+        }
+
+        return { tid: strategy.tid, name: strategy.test_name, data: [], color: getColor(index) };
+      } catch {
+        return { tid: strategy.tid, name: strategy.test_name, data: [], color: getColor(index) };
+      }
+    });
+  }, [strategies, strategyResults, getColor]);
+
+  // Check if we have any data to display
+  const hasData = equityCurves.some((curve) => curve.data.length > 0);
+
+  // Initialize and update chart
+  useEffect(() => {
+    if (!chartContainerRef.current || !hasData) return;
+
+    // Create chart
+    const chart = createChart(chartContainerRef.current, {
+      width: chartContainerRef.current.clientWidth,
+      height: 300,
+      ...CHART_THEME,
+    });
+    chartRef.current = chart;
+
+    // Add series for each strategy
+    seriesRef.current = [];
+    equityCurves.forEach((curve) => {
+      if (curve.data.length === 0) return;
+
+      const series = chart.addLineSeries({
+        color: curve.color,
+        lineWidth: 2,
+        title: curve.name || curve.tid,
+        priceFormat: {
+          type: 'custom',
+          formatter: (price) => `${price.toFixed(2)}%`,
+        },
+      });
+
+      // Sort data by time
+      const sortedData = [...curve.data].sort((a, b) => a.time - b.time);
+      series.setData(sortedData);
+      seriesRef.current.push(series);
+    });
+
+    // Fit content
+    chart.timeScale().fitContent();
+
+    // Handle resize
+    const handleResize = () => {
+      if (chartRef.current && chartContainerRef.current) {
+        chartRef.current.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+        });
+      }
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (chartRef.current) {
+        chartRef.current.remove();
+        chartRef.current = null;
+      }
+      seriesRef.current = [];
+    };
+  }, [equityCurves, hasData]);
+
+  if (!hasData) {
+    return (
+      <EmptyState
+        icon={ShowChartIcon}
+        title="No Equity Data Available"
+        description="Equity curve data is not available for the selected strategies."
+      />
+    );
+  }
+
+  return (
+    <Box>
+      {/* Legend */}
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+        {equityCurves
+          .filter((curve) => curve.data.length > 0)
+          .map((curve) => (
+            <Chip
+              key={curve.tid}
+              label={curve.name || curve.tid}
+              size="small"
+              sx={{
+                backgroundColor: curve.color,
+                color: '#000',
+                fontWeight: 600,
+              }}
+            />
+          ))}
+      </Box>
+      {/* Chart */}
+      <div ref={chartContainerRef} style={{ width: '100%' }} />
+    </Box>
+  );
+}
 
 // Extract metrics from PyFolio analyzer
 const extractPyFolioMetric = (result, metricKey) => {
@@ -301,6 +478,23 @@ export default function StrategyComparison() {
           </Box>
         </Paper>
       </Grid>
+
+      {/* Equity Curve Overlay Chart */}
+      {selectedStrategies.length >= 2 && (
+        <Grid item xs={12}>
+          <Paper sx={paperSx}>
+            <Title>Equity Curve Comparison</Title>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Normalized returns (%) starting from 0% at the beginning of each backtest period.
+            </Typography>
+            <EquityCurveChart
+              strategies={selectedStrategies}
+              strategyResults={strategyResults}
+              getColor={getStrategyColor}
+            />
+          </Paper>
+        </Grid>
+      )}
 
       {/* Comparison Table */}
       <Grid item xs={12}>

@@ -3,8 +3,8 @@
 
 export const FEATURES = {
   // When true, use TradingView Lightweight Charts instead of Highcharts
-  // Set REACT_APP_USE_TRADINGVIEW=true in .env.local to enable
-  USE_TRADINGVIEW: process.env.REACT_APP_USE_TRADINGVIEW === 'true',
+  // Now enabled by default for dark theme trading experience
+  USE_TRADINGVIEW: process.env.REACT_APP_USE_TRADINGVIEW !== 'false',
 };
 
 export default FEATURES;

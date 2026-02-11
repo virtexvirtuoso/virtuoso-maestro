@@ -137,6 +137,7 @@ export default function Home() {
   const [recentOptimizations, setRecentOptimizations] = useState([]);
   const [loadingProviders, setLoadingProviders] = useState(true);
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState(null);
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(null); // null = loading, true/false = determined
 
   const { notify } = useNotification();
@@ -225,11 +226,18 @@ export default function Home() {
   };
 
   const openOptimizationWizard = () => {
+    setSelectedPreset(null);
     setWizardOpen(true);
   };
 
   const closeOptimizationWizard = () => {
     setWizardOpen(false);
+    setSelectedPreset(null);
+  };
+
+  const handleSelectPreset = (preset) => {
+    setSelectedPreset(preset);
+    setWizardOpen(true);
   };
 
   // Calculate total symbols
@@ -242,8 +250,15 @@ export default function Home() {
   if (isFirstTimeUser === true) {
     return (
       <>
-        <WelcomeEmptyState onStartOptimization={openOptimizationWizard} />
-        <OptimizationWizard open={wizardOpen} onClose={closeOptimizationWizard} />
+        <WelcomeEmptyState
+          onStartOptimization={openOptimizationWizard}
+          onSelectPreset={handleSelectPreset}
+        />
+        <OptimizationWizard
+          open={wizardOpen}
+          onClose={closeOptimizationWizard}
+          initialPreset={selectedPreset}
+        />
       </>
     );
   }
@@ -424,7 +439,11 @@ export default function Home() {
       </Grid>
 
       {/* Optimization Wizard */}
-      <OptimizationWizard open={wizardOpen} onClose={closeOptimizationWizard} />
+      <OptimizationWizard
+        open={wizardOpen}
+        onClose={closeOptimizationWizard}
+        initialPreset={selectedPreset}
+      />
     </>
   );
 }

@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maestro - New Optimization Wizard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            maestro: {
+              gold: '#fbbf24',
+              dark: '#0a0a0a',
+              darker: '#050505',
+              border: '#1a1a1a',
+              text: '#e5e5e5',
+              muted: '#737373'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'IBM Plex Mono', monospace; }
+    .glow-gold { text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
+  </style>
+</head>
+<body class="bg-maestro-darker text-maestro-text min-h-screen">
+
+  <!-- Modal Overlay -->
+  <div class="fixed inset-0 bg-black/80 flex items-center justify-center p-4">
+
+    <!-- Wizard Modal -->
+    <div class="bg-maestro-dark border border-maestro-border rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+
+      <!-- Header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-maestro-border">
+        <h2 class="text-lg font-semibold text-maestro-text">New Optimization Test</h2>
+        <button class="text-maestro-muted hover:text-maestro-text p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Progress Steps -->
+      <div class="px-6 py-4 border-b border-maestro-border bg-maestro-darker">
+        <div class="flex items-center justify-between max-w-md mx-auto">
+          <!-- Step 1 - Active -->
+          <div class="flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full bg-maestro-gold text-black flex items-center justify-center font-semibold text-sm">1</div>
+            <span class="text-xs mt-1.5 text-maestro-gold">Data</span>
+          </div>
+          <div class="flex-1 h-0.5 bg-maestro-border mx-2"></div>
+          <!-- Step 2 -->
+          <div class="flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full bg-maestro-border text-maestro-muted flex items-center justify-center font-semibold text-sm">2</div>
+            <span class="text-xs mt-1.5 text-maestro-muted">Strategy</span>
+          </div>
+          <div class="flex-1 h-0.5 bg-maestro-border mx-2"></div>
+          <!-- Step 3 -->
+          <div class="flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full bg-maestro-border text-maestro-muted flex items-center justify-center font-semibold text-sm">3</div>
+            <span class="text-xs mt-1.5 text-maestro-muted">Settings</span>
+          </div>
+          <div class="flex-1 h-0.5 bg-maestro-border mx-2"></div>
+          <!-- Step 4 -->
+          <div class="flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full bg-maestro-border text-maestro-muted flex items-center justify-center font-semibold text-sm">4</div>
+            <span class="text-xs mt-1.5 text-maestro-muted">Review</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Content Area -->
+      <div class="flex-1 overflow-y-auto p-6">
+
+        <!-- Step 1: Data Source Selection -->
+        <div class="space-y-6">
+
+          <!-- Test Name -->
+          <div>
+            <label class="block text-sm font-medium text-maestro-text mb-2">Test Name</label>
+            <input
+              type="text"
+              value="BTCUSDT EMA Strategy v1"
+              class="w-full bg-maestro-darker border border-maestro-border rounded-lg px-4 py-3 text-maestro-text focus:outline-none focus:border-maestro-gold transition-colors"
+              placeholder="Enter a descriptive name..."
+            >
+          </div>
+
+          <!-- Provider Selection -->
+          <div>
+            <label class="block text-sm font-medium text-maestro-text mb-3">Select Data Source</label>
+            <div class="grid grid-cols-2 gap-3">
+              <!-- Binance - Selected -->
+              <div class="border-2 border-maestro-gold bg-maestro-gold/5 rounded-xl p-4 cursor-pointer">
+                <div class="flex items-center gap-3 mb-2">
+                  <div class="w-10 h-10 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                    <span class="text-yellow-500 font-bold">B</span>
+                  </div>
+                  <div>
+                    <h4 class="font-semibold text-maestro-text">Binance</h4>
+                    <span class="text-xs text-green-500">4 symbols available</span>
+                  </div>
+                  <div class="ml-auto">
+                    <svg class="w-5 h-5 text-maestro-gold" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+              <!-- BitMEX -->
+              <div class="border border-maestro-border hover:border-maestro-gold/30 rounded-xl p-4 cursor-pointer transition-colors">
+                <div class="flex items-center gap-3 mb-2">
+                  <div class="w-10 h-10 bg-red-500/10 rounded-lg flex items-center justify-center">
+                    <span class="text-red-500 font-bold">M</span>
+                  </div>
+                  <div>
+                    <h4 class="font-semibold text-maestro-text">BitMEX</h4>
+                    <span class="text-xs text-green-500">2 symbols available</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Symbol & Timeframe -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-maestro-text mb-2">Symbol</label>
+              <div class="relative">
+                <select class="w-full bg-maestro-darker border border-maestro-border rounded-lg px-4 py-3 text-maestro-text appearance-none focus:outline-none focus:border-maestro-gold transition-colors">
+                  <option>BTCUSDT</option>
+                  <option>ETHUSDT</option>
+                  <option>SOLUSDT</option>
+                  <option>BNBUSDT</option>
+                </select>
+                <svg class="w-4 h-4 text-maestro-muted absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </div>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-maestro-text mb-2">Time Frame</label>
+              <div class="relative">
+                <select class="w-full bg-maestro-darker border border-maestro-border rounded-lg px-4 py-3 text-maestro-text appearance-none focus:outline-none focus:border-maestro-gold transition-colors">
+                  <option>1 Day</option>
+                  <option>1 Hour</option>
+                  <option>5 Minutes</option>
+                  <option>1 Minute</option>
+                </select>
+                <svg class="w-4 h-4 text-maestro-muted absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <!-- Date Range -->
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label class="block text-sm font-medium text-maestro-text">Date Range</label>
+              <span class="text-xs text-green-500">Data available: 2019-01-01 to 2024-12-31</span>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-xs text-maestro-muted mb-1 block">From</label>
+                <input
+                  type="date"
+                  value="2020-01-01"
+                  class="w-full bg-maestro-darker border border-maestro-border rounded-lg px-4 py-3 text-maestro-text focus:outline-none focus:border-maestro-gold transition-colors"
+                >
+              </div>
+              <div>
+                <label class="text-xs text-maestro-muted mb-1 block">To</label>
+                <input
+                  type="date"
+                  value="2024-12-31"
+                  class="w-full bg-maestro-darker border border-maestro-border rounded-lg px-4 py-3 text-maestro-text focus:outline-none focus:border-maestro-gold transition-colors"
+                >
+              </div>
+            </div>
+            <div class="mt-2 flex items-center gap-2 text-sm text-maestro-muted">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              <span>1,826 candles selected</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="flex items-center justify-between px-6 py-4 border-t border-maestro-border bg-maestro-darker">
+        <button class="px-4 py-2 text-maestro-muted hover:text-maestro-text transition-colors">
+          Cancel
+        </button>
+        <button class="flex items-center gap-2 bg-maestro-gold text-black px-6 py-2.5 rounded-lg font-medium hover:bg-yellow-400 transition-colors">
+          Next: Strategy
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

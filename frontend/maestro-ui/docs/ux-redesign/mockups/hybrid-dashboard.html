@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Maestro - Walk-Forward Optimization</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background: #0a0a0a; }
+    .mono { font-family: 'IBM Plex Mono', monospace; }
+    .gold { color: #fbbf24; }
+    .gold-bg { background: #fbbf24; }
+    .gold-border { border-color: #fbbf24; }
+    .glow { box-shadow: 0 0 20px rgba(251, 191, 36, 0.15); }
+    .card { background: #111; border: 1px solid #222; border-radius: 12px; }
+    .card:hover { border-color: #333; }
+    .btn-primary { background: #fbbf24; color: #000; font-weight: 600; }
+    .btn-primary:hover { background: #f59e0b; }
+    .btn-secondary { background: transparent; border: 1px solid #333; color: #fff; }
+    .btn-secondary:hover { border-color: #fbbf24; color: #fbbf24; }
+    .step-active { background: #fbbf24; color: #000; }
+    .step-complete { background: #10b981; color: #fff; }
+    .step-pending { background: #333; color: #666; }
+    .provider-card { transition: all 0.2s; cursor: pointer; }
+    .provider-card:hover { border-color: #fbbf24; transform: translateY(-2px); }
+    .provider-card.selected { border-color: #fbbf24; background: rgba(251, 191, 36, 0.1); }
+    .symbol-chip { padding: 6px 12px; background: #1a1a1a; border: 1px solid #333; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .symbol-chip:hover { border-color: #fbbf24; }
+    .symbol-chip.selected { background: #fbbf24; color: #000; border-color: #fbbf24; }
+    .category-tab { padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+    .category-tab:hover { background: #1a1a1a; }
+    .category-tab.active { background: #fbbf24; color: #000; }
+    .strategy-row { padding: 12px 16px; border-bottom: 1px solid #222; cursor: pointer; }
+    .strategy-row:hover { background: #1a1a1a; }
+    .strategy-row.selected { background: rgba(251, 191, 36, 0.1); border-left: 3px solid #fbbf24; }
+    .timeframe-btn { padding: 8px 16px; border: 1px solid #333; border-radius: 6px; font-size: 13px; }
+    .timeframe-btn:hover { border-color: #fbbf24; }
+    .timeframe-btn.selected { background: #fbbf24; color: #000; border-color: #fbbf24; }
+    .input-field { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 12px 16px; color: #fff; width: 100%; }
+    .input-field:focus { outline: none; border-color: #fbbf24; }
+    .wizard-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 100; }
+    .wizard-content { background: #111; border: 1px solid #333; border-radius: 16px; width: 90%; max-width: 800px; max-height: 90vh; overflow: hidden; }
+  </style>
+</head>
+<body class="text-white min-h-screen">
+
+  <!-- Navigation -->
+  <nav class="border-b border-gray-800 px-6 py-4">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center gap-8">
+        <h1 class="text-xl font-bold gold mono">MAESTRO</h1>
+        <div class="flex items-center gap-1 text-sm">
+          <a href="#" class="px-4 py-2 rounded-lg bg-yellow-500/10 gold">Dashboard</a>
+          <a href="#" class="px-4 py-2 rounded-lg text-gray-400 hover:text-white">Results</a>
+          <a href="#" class="px-4 py-2 rounded-lg text-gray-400 hover:text-white">Compare</a>
+          <a href="#" class="px-4 py-2 rounded-lg text-gray-400 hover:text-white">Data</a>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="flex items-center gap-2 text-sm text-green-400">
+          <span class="w-2 h-2 rounded-full bg-green-400"></span>
+          Backend Connected
+        </span>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="p-6 max-w-7xl mx-auto">
+
+    <!-- Stats Row -->
+    <div class="grid grid-cols-4 gap-4 mb-8">
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm mb-1">Data Sources</div>
+        <div class="text-2xl font-bold gold mono">6</div>
+        <div class="text-xs text-gray-500 mt-1">Exchanges connected</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm mb-1">Symbols</div>
+        <div class="text-2xl font-bold gold mono">31</div>
+        <div class="text-xs text-gray-500 mt-1">Trading pairs available</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm mb-1">Strategies</div>
+        <div class="text-2xl font-bold gold mono">65</div>
+        <div class="text-xs text-gray-500 mt-1">Across 6 categories</div>
+      </div>
+      <div class="card p-4">
+        <div class="text-gray-400 text-sm mb-1">Optimizations</div>
+        <div class="text-2xl font-bold gold mono">0</div>
+        <div class="text-xs text-gray-500 mt-1">Completed today</div>
+      </div>
+    </div>
+
+    <!-- Two Column Layout -->
+    <div class="grid grid-cols-3 gap-6">
+
+      <!-- Left: Data Sources -->
+      <div class="col-span-2">
+        <div class="card p-6">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-lg font-semibold">Data Sources</h2>
+            <button class="btn-primary px-4 py-2 rounded-lg text-sm" onclick="openWizard()">
+              + New Optimization
+            </button>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4">
+            <!-- Binance -->
+            <div class="provider-card card p-4">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                  <span class="text-lg">₿</span>
+                </div>
+                <div>
+                  <div class="font-semibold">Binance</div>
+                  <div class="text-xs text-gray-500">20 symbols</div>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded">BTCUSDT</span>
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded">ETHUSDT</span>
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded">SOLUSDT</span>
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded text-gray-500">+17</span>
+              </div>
+            </div>
+
+            <!-- BitMEX -->
+            <div class="provider-card card p-4">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+                  <span class="text-lg">🔴</span>
+                </div>
+                <div>
+                  <div class="font-semibold">BitMEX</div>
+                  <div class="text-xs text-gray-500">1 symbol</div>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded">XBTUSD</span>
+              </div>
+            </div>
+
+            <!-- Bybit -->
+            <div class="provider-card card p-4">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                  <span class="text-lg">🟠</span>
+                </div>
+                <div>
+                  <div class="font-semibold">Bybit</div>
+                  <div class="text-xs text-gray-500">2 symbols</div>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded">MYXUSDT</span>
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded">RIVERUSDT</span>
+              </div>
+            </div>
+
+            <!-- MEXC -->
+            <div class="provider-card card p-4">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                  <span class="text-lg">Ⓜ️</span>
+                </div>
+                <div>
+                  <div class="font-semibold">MEXC</div>
+                  <div class="text-xs text-gray-500">5 symbols</div>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded">MYXUSDT</span>
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded">RAINUSDT</span>
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded text-gray-500">+3</span>
+              </div>
+            </div>
+
+            <!-- KuCoin -->
+            <div class="provider-card card p-4">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <span class="text-lg">🟢</span>
+                </div>
+                <div>
+                  <div class="font-semibold">KuCoin</div>
+                  <div class="text-xs text-gray-500">2 symbols</div>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded">RAINUSDT</span>
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded">ADIUSDT</span>
+              </div>
+            </div>
+
+            <!-- Gate -->
+            <div class="provider-card card p-4">
+              <div class="flex items-center gap-3 mb-3">
+                <div class="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                  <span class="text-lg">🟣</span>
+                </div>
+                <div>
+                  <div class="font-semibold">Gate.io</div>
+                  <div class="text-xs text-gray-500">1 symbol</div>
+                </div>
+              </div>
+              <div class="flex flex-wrap gap-1">
+                <span class="text-xs px-2 py-1 bg-gray-800 rounded">MYXUSDT</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Quick Actions & Recent -->
+      <div class="space-y-6">
+        <!-- Strategy Categories -->
+        <div class="card p-6">
+          <h3 class="font-semibold mb-4">Strategy Categories</h3>
+          <div class="space-y-2">
+            <div class="flex items-center justify-between py-2 border-b border-gray-800">
+              <span class="text-gray-300">Technical</span>
+              <span class="mono gold">19</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b border-gray-800">
+              <span class="text-gray-300">Hybrids</span>
+              <span class="mono gold">15</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b border-gray-800">
+              <span class="text-gray-300">Derivatives</span>
+              <span class="mono gold">11</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b border-gray-800">
+              <span class="text-gray-300">Scalping</span>
+              <span class="mono gold">8</span>
+            </div>
+            <div class="flex items-center justify-between py-2 border-b border-gray-800">
+              <span class="text-gray-300">Momentum</span>
+              <span class="mono gold">6</span>
+            </div>
+            <div class="flex items-center justify-between py-2">
+              <span class="text-gray-300">Composite</span>
+              <span class="mono gold">6</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="card p-6">
+          <h3 class="font-semibold mb-4">Recent Optimizations</h3>
+          <div class="text-center py-8 text-gray-500">
+            <div class="text-4xl mb-3">📊</div>
+            <div class="text-sm">No optimizations yet</div>
+            <div class="text-xs mt-1">Run your first test to see results here</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Wizard Modal (hidden by default) -->
+  <div id="wizard-modal" class="wizard-modal hidden">
+    <div class="wizard-content">
+      <!-- Wizard Header -->
+      <div class="p-6 border-b border-gray-800">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold">New Optimization</h2>
+          <button onclick="closeWizard()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+        </div>
+
+        <!-- Step Indicator -->
+        <div class="flex items-center gap-2">
+          <div id="step1-indicator" class="step-active w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold">1</div>
+          <div class="flex-1 h-1 bg-gray-700 rounded"><div id="progress1" class="h-full bg-yellow-500 rounded w-0 transition-all"></div></div>
+          <div id="step2-indicator" class="step-pending w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold">2</div>
+          <div class="flex-1 h-1 bg-gray-700 rounded"><div id="progress2" class="h-full bg-yellow-500 rounded w-0 transition-all"></div></div>
+          <div id="step3-indicator" class="step-pending w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold">3</div>
+          <div class="flex-1 h-1 bg-gray-700 rounded"><div id="progress3" class="h-full bg-yellow-500 rounded w-0 transition-all"></div></div>
+          <div id="step4-indicator" class="step-pending w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold">4</div>
+        </div>
+        <div class="flex justify-between mt-2 text-xs text-gray-500">
+          <span>Data Source</span>
+          <span>Strategy</span>
+          <span>Settings</span>
+          <span>Review</span>
+        </div>
+      </div>
+
+      <!-- Wizard Content -->
+      <div class="p-6 max-h-[60vh] overflow-y-auto">
+
+        <!-- Step 1: Data Source -->
+        <div id="step1" class="step-content">
+          <h3 class="font-semibold mb-4">Select Data Source</h3>
+
+          <!-- Provider Selection -->
+          <div class="mb-6">
+            <label class="text-sm text-gray-400 mb-2 block">Exchange</label>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="provider-card card p-3 selected" onclick="selectProvider(this, 'binance')">
+                <div class="font-medium">Binance</div>
+                <div class="text-xs text-gray-500">20 symbols</div>
+              </div>
+              <div class="provider-card card p-3" onclick="selectProvider(this, 'bitmex')">
+                <div class="font-medium">BitMEX</div>
+                <div class="text-xs text-gray-500">1 symbol</div>
+              </div>
+              <div class="provider-card card p-3" onclick="selectProvider(this, 'bybit')">
+                <div class="font-medium">Bybit</div>
+                <div class="text-xs text-gray-500">2 symbols</div>
+              </div>
+              <div class="provider-card card p-3" onclick="selectProvider(this, 'mexc')">
+                <div class="font-medium">MEXC</div>
+                <div class="text-xs text-gray-500">5 symbols</div>
+              </div>
+              <div class="provider-card card p-3" onclick="selectProvider(this, 'kucoin')">
+                <div class="font-medium">KuCoin</div>
+                <div class="text-xs text-gray-500">2 symbols</div>
+              </div>
+              <div class="provider-card card p-3" onclick="selectProvider(this, 'gate')">
+                <div class="font-medium">Gate.io</div>
+                <div class="text-xs text-gray-500">1 symbol</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Symbol Selection -->
+          <div class="mb-6">
+            <label class="text-sm text-gray-400 mb-2 block">Symbol</label>
+            <div id="symbol-chips" class="flex flex-wrap gap-2">
+              <span class="symbol-chip selected" onclick="selectSymbol(this)">BTCUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">ETHUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">SOLUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">CGPTUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">RENDERUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">FETUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">TAOUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">ARBUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">OPUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">SUIUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">TIAUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">INJUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">LINKUSDT</span>
+              <span class="symbol-chip" onclick="selectSymbol(this)">AVAXUSDT</span>
+            </div>
+          </div>
+
+          <!-- Timeframe -->
+          <div class="mb-6">
+            <label class="text-sm text-gray-400 mb-2 block">Timeframe</label>
+            <div class="flex gap-2">
+              <button class="timeframe-btn" onclick="selectTimeframe(this)">1m</button>
+              <button class="timeframe-btn" onclick="selectTimeframe(this)">5m</button>
+              <button class="timeframe-btn" onclick="selectTimeframe(this)">15m</button>
+              <button class="timeframe-btn" onclick="selectTimeframe(this)">1h</button>
+              <button class="timeframe-btn selected" onclick="selectTimeframe(this)">4h</button>
+              <button class="timeframe-btn" onclick="selectTimeframe(this)">1d</button>
+            </div>
+          </div>
+
+          <!-- Date Range -->
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-sm text-gray-400 mb-2 block">Start Date</label>
+              <input type="date" class="input-field" value="2023-01-01">
+            </div>
+            <div>
+              <label class="text-sm text-gray-400 mb-2 block">End Date</label>
+              <input type="date" class="input-field" value="2026-02-06">
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Strategy (hidden) -->
+        <div id="step2" class="step-content hidden">
+          <h3 class="font-semibold mb-4">Select Strategy</h3>
+
+          <!-- Category Tabs -->
+          <div class="flex gap-2 mb-4 overflow-x-auto pb-2">
+            <span class="category-tab active" onclick="selectCategory(this, 'technical')">Technical (19)</span>
+            <span class="category-tab" onclick="selectCategory(this, 'hybrids')">Hybrids (15)</span>
+            <span class="category-tab" onclick="selectCategory(this, 'derivatives')">Derivatives (11)</span>
+            <span class="category-tab" onclick="selectCategory(this, 'scalping')">Scalping (8)</span>
+            <span class="category-tab" onclick="selectCategory(this, 'momentum')">Momentum (6)</span>
+            <span class="category-tab" onclick="selectCategory(this, 'composite')">Composite (6)</span>
+          </div>
+
+          <!-- Strategy List -->
+          <div class="card max-h-64 overflow-y-auto">
+            <div class="strategy-row selected" onclick="selectStrategy(this)">
+              <div class="font-medium">Ichimoku Cloud</div>
+              <div class="text-xs text-gray-500">Trend following with cloud support/resistance</div>
+            </div>
+            <div class="strategy-row" onclick="selectStrategy(this)">
+              <div class="font-medium">MACD Crossover</div>
+              <div class="text-xs text-gray-500">Classic momentum indicator</div>
+            </div>
+            <div class="strategy-row" onclick="selectStrategy(this)">
+              <div class="font-medium">RSI Divergence</div>
+              <div class="text-xs text-gray-500">Overbought/oversold with divergence detection</div>
+            </div>
+            <div class="strategy-row" onclick="selectStrategy(this)">
+              <div class="font-medium">Bollinger Bands</div>
+              <div class="text-xs text-gray-500">Volatility-based mean reversion</div>
+            </div>
+            <div class="strategy-row" onclick="selectStrategy(this)">
+              <div class="font-medium">ADX Trend</div>
+              <div class="text-xs text-gray-500">Trend strength filter</div>
+            </div>
+            <div class="strategy-row" onclick="selectStrategy(this)">
+              <div class="font-medium">EMA Cross</div>
+              <div class="text-xs text-gray-500">Fast/slow EMA crossover</div>
+            </div>
+          </div>
+
+          <!-- Strategy Parameters (dynamic) -->
+          <div class="mt-6">
+            <h4 class="text-sm text-gray-400 mb-3">Strategy Parameters</h4>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-xs text-gray-500 mb-1 block">Tenkan Period</label>
+                <input type="number" class="input-field" value="9">
+                <div class="text-xs text-gray-600 mt-1">Conversion line period (7-14 typical)</div>
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 mb-1 block">Kijun Period</label>
+                <input type="number" class="input-field" value="26">
+                <div class="text-xs text-gray-600 mt-1">Base line period (20-30 typical)</div>
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 mb-1 block">Senkou B Period</label>
+                <input type="number" class="input-field" value="52">
+                <div class="text-xs text-gray-600 mt-1">Leading span B period (40-60 typical)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Settings (hidden) -->
+        <div id="step3" class="step-content hidden">
+          <h3 class="font-semibold mb-4">Optimization Settings</h3>
+
+          <!-- Optimization Type -->
+          <div class="mb-6">
+            <label class="text-sm text-gray-400 mb-3 block">Optimization Type</label>
+            <div class="grid grid-cols-3 gap-3">
+              <div class="card p-4 cursor-pointer border-yellow-500 bg-yellow-500/10" onclick="selectOptType(this, 'backtest')">
+                <div class="font-medium mb-1">Backtest</div>
+                <div class="text-xs text-gray-500">Single pass with fixed parameters</div>
+              </div>
+              <div class="card p-4 cursor-pointer" onclick="selectOptType(this, 'walkforward')">
+                <div class="font-medium mb-1">Walk-Forward</div>
+                <div class="text-xs text-gray-500">Rolling optimization (recommended)</div>
+              </div>
+              <div class="card p-4 cursor-pointer" onclick="selectOptType(this, 'both')">
+                <div class="font-medium mb-1">Both</div>
+                <div class="text-xs text-gray-500">Full analysis</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Capital Settings -->
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            <div>
+              <label class="text-sm text-gray-400 mb-2 block">Starting Capital</label>
+              <div class="relative">
+                <span class="absolute left-3 top-3 text-gray-500">$</span>
+                <input type="number" class="input-field pl-7" value="10000">
+              </div>
+              <div class="text-xs text-gray-600 mt-1">Initial portfolio value for simulation</div>
+            </div>
+            <div>
+              <label class="text-sm text-gray-400 mb-2 block">Commission Rate</label>
+              <div class="relative">
+                <input type="number" class="input-field pr-7" value="0.1" step="0.01">
+                <span class="absolute right-3 top-3 text-gray-500">%</span>
+              </div>
+              <div class="text-xs text-gray-600 mt-1">Typical: 0.05-0.20% for crypto</div>
+            </div>
+          </div>
+
+          <!-- Walk-Forward Settings -->
+          <div class="card p-4 bg-gray-900/50">
+            <h4 class="font-medium mb-3">Walk-Forward Settings</h4>
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="text-xs text-gray-500 mb-1 block">Number of Splits</label>
+                <input type="number" class="input-field" value="10">
+                <div class="text-xs text-gray-600 mt-1">More splits = more robust but slower</div>
+              </div>
+              <div>
+                <label class="text-xs text-gray-500 mb-1 block">Mode</label>
+                <select class="input-field">
+                  <option value="rolling">Rolling (recommended)</option>
+                  <option value="expanding">Expanding</option>
+                  <option value="adaptive">Adaptive</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Review (hidden) -->
+        <div id="step4" class="step-content hidden">
+          <h3 class="font-semibold mb-4">Review & Run</h3>
+
+          <div class="mb-6">
+            <label class="text-sm text-gray-400 mb-2 block">Test Name</label>
+            <input type="text" class="input-field" value="BTCUSDT-Ichimoku-WF-4h" placeholder="Enter a name for this optimization">
+          </div>
+
+          <div class="card p-4 mb-6">
+            <h4 class="text-sm text-gray-400 mb-3">Summary</h4>
+            <div class="grid grid-cols-2 gap-y-3 text-sm">
+              <div class="text-gray-500">Exchange</div>
+              <div class="font-medium">Binance</div>
+              <div class="text-gray-500">Symbol</div>
+              <div class="font-medium mono">BTCUSDT</div>
+              <div class="text-gray-500">Timeframe</div>
+              <div class="font-medium">4h</div>
+              <div class="text-gray-500">Date Range</div>
+              <div class="font-medium">Jan 2023 - Feb 2026</div>
+              <div class="text-gray-500">Strategy</div>
+              <div class="font-medium">Ichimoku Cloud</div>
+              <div class="text-gray-500">Optimization</div>
+              <div class="font-medium">Backtest</div>
+              <div class="text-gray-500">Capital</div>
+              <div class="font-medium mono">$10,000</div>
+              <div class="text-gray-500">Commission</div>
+              <div class="font-medium mono">0.1%</div>
+            </div>
+          </div>
+
+          <div class="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+            <div class="flex items-start gap-3">
+              <span class="text-xl">💡</span>
+              <div class="text-sm">
+                <div class="font-medium gold mb-1">Ready to Run</div>
+                <div class="text-gray-400">This optimization will test the Ichimoku Cloud strategy on BTCUSDT 4h data from 2023-2026. Estimated time: ~2 minutes.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wizard Footer -->
+      <div class="p-6 border-t border-gray-800 flex justify-between">
+        <button id="back-btn" class="btn-secondary px-6 py-2 rounded-lg hidden" onclick="prevStep()">Back</button>
+        <div></div>
+        <button id="next-btn" class="btn-primary px-6 py-2 rounded-lg" onclick="nextStep()">Next: Strategy</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 4;
+
+    function openWizard() {
+      document.getElementById('wizard-modal').classList.remove('hidden');
+    }
+
+    function closeWizard() {
+      document.getElementById('wizard-modal').classList.add('hidden');
+    }
+
+    function selectProvider(el, provider) {
+      document.querySelectorAll('.provider-card').forEach(p => p.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    function selectSymbol(el) {
+      document.querySelectorAll('.symbol-chip').forEach(s => s.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    function selectTimeframe(el) {
+      document.querySelectorAll('.timeframe-btn').forEach(t => t.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    function selectCategory(el, cat) {
+      document.querySelectorAll('.category-tab').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+    }
+
+    function selectStrategy(el) {
+      document.querySelectorAll('.strategy-row').forEach(s => s.classList.remove('selected'));
+      el.classList.add('selected');
+    }
+
+    function selectOptType(el, type) {
+      el.parentNode.querySelectorAll('.card').forEach(c => {
+        c.classList.remove('border-yellow-500', 'bg-yellow-500/10');
+        c.classList.add('border-gray-700');
+      });
+      el.classList.remove('border-gray-700');
+      el.classList.add('border-yellow-500', 'bg-yellow-500/10');
+    }
+
+    function updateStepIndicators() {
+      for (let i = 1; i <= totalSteps; i++) {
+        const indicator = document.getElementById(`step${i}-indicator`);
+        indicator.classList.remove('step-active', 'step-complete', 'step-pending');
+        if (i < currentStep) {
+          indicator.classList.add('step-complete');
+        } else if (i === currentStep) {
+          indicator.classList.add('step-active');
+        } else {
+          indicator.classList.add('step-pending');
+        }
+      }
+
+      // Update progress bars
+      for (let i = 1; i < totalSteps; i++) {
+        const progress = document.getElementById(`progress${i}`);
+        progress.style.width = currentStep > i ? '100%' : '0%';
+      }
+    }
+
+    function showStep(step) {
+      document.querySelectorAll('.step-content').forEach(s => s.classList.add('hidden'));
+      document.getElementById(`step${step}`).classList.remove('hidden');
+
+      const backBtn = document.getElementById('back-btn');
+      const nextBtn = document.getElementById('next-btn');
+
+      backBtn.classList.toggle('hidden', step === 1);
+
+      if (step === totalSteps) {
+        nextBtn.innerHTML = '🚀 Run Optimization';
+        nextBtn.onclick = runOptimization;
+      } else {
+        const labels = ['Strategy', 'Settings', 'Review'];
+        nextBtn.innerHTML = `Next: ${labels[step - 1]}`;
+        nextBtn.onclick = nextStep;
+      }
+
+      updateStepIndicators();
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) {
+        currentStep++;
+        showStep(currentStep);
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 1) {
+        currentStep--;
+        showStep(currentStep);
+      }
+    }
+
+    function runOptimization() {
+      alert('Starting optimization... (this would call the API)');
+      closeWizard();
+    }
+  </script>
+</body>
+</html>
