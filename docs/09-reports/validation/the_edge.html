@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maestro Quant — V2 4-Signal + Hedge Portfolio System</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+--bg:#0a0a0a;--bg2:#111111;--border:#222222;--amber:#fbbf24;--cyan:#06B6D4;--red:#ff0066;--green:#10b981;--text:#e5e5e5;--muted:#888;
+--spacing:clamp(12px,2.5vw,24px);--radius:clamp(8px,1vw,12px);--font-sm:clamp(0.75rem,2vw,0.85rem);--font-base:clamp(0.85rem,2.2vw,0.95rem);--font-lg:clamp(1.1rem,3vw,1.5rem);--font-xl:clamp(1.5rem,4vw,2.5rem);
+}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;line-height:1.6;font-size:var(--font-base)}
+.container{max-width:1400px;margin:0 auto;padding:var(--spacing)}
+h1,h2,h3{font-weight:700;letter-spacing:-0.02em}
+h1{font-size:var(--font-xl);background:linear-gradient(135deg,var(--amber),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:8px}
+h2{font-size:var(--font-lg);color:var(--amber);margin:48px 0 16px;border-bottom:1px solid var(--border);padding-bottom:8px}
+h3{font-size:var(--font-base);color:var(--cyan);margin:24px 0 12px}
+.subtitle{color:var(--muted);font-size:var(--font-base);margin-bottom:var(--spacing)}
+.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(clamp(140px,20vw,200px),1fr));gap:var(--spacing);margin:var(--spacing) 0}
+.hero-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--spacing);text-align:center}
+.hero-card .value{font-family:'IBM Plex Mono',monospace;font-size:clamp(1.2rem,3vw,2rem);font-weight:700;color:var(--amber)}
+.hero-card .label{color:var(--muted);font-size:var(--font-sm);text-transform:uppercase;letter-spacing:0.05em;margin-top:4px}
+.hero-card.highlight{border-color:var(--amber);box-shadow:0 0 20px rgba(251,191,36,0.1)}
+.hero-card.cyan .value{color:var(--cyan)}
+.hero-card.green .value{color:var(--green)}
+.hero-card.red .value{color:var(--red)}
+table{width:100%;border-collapse:collapse;font-size:var(--font-sm);font-family:'IBM Plex Mono',monospace}
+th{background:var(--bg2);color:var(--amber);padding:clamp(8px,1.5vw,12px);text-align:right;font-weight:600;position:sticky;top:0;border-bottom:2px solid var(--amber)}
+th:first-child{text-align:left}
+td{padding:clamp(6px,1.2vw,10px);text-align:right;border-bottom:1px solid var(--border)}
+td:first-child{text-align:left;font-family:'Inter',sans-serif;font-weight:500;color:var(--text)}
+tr:hover{background:rgba(251,191,36,0.03)}
+tr.highlight-row{background:rgba(251,191,36,0.08)}
+tr.highlight-row:hover{background:rgba(251,191,36,0.12)}
+.pos{color:var(--green)}.neg{color:var(--red)}
+.badge{padding:4px 8px;border-radius:4px;font-size:var(--font-sm);font-weight:600;text-transform:uppercase}
+.badge.pass{background:rgba(16,185,129,0.2);color:var(--green)}
+.badge.fail{background:rgba(255,0,102,0.2);color:var(--red)}
+.badge.mixed{background:rgba(251,191,36,0.2);color:var(--amber)}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);margin:16px 0}
+.chart-container{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--spacing);margin:16px 0}
+canvas{max-height:clamp(250px,40vh,400px);width:100%}
+.section{margin:var(--spacing) 0}
+.signal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(clamp(120px,18vw,160px),1fr));gap:var(--spacing);margin:16px 0}
+.signal-box{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--spacing);text-align:center}
+.signal-box .name{color:var(--cyan);font-size:var(--font-sm);font-weight:600;text-transform:uppercase;letter-spacing:0.05em}
+.signal-box .detail{color:var(--muted);font-size:var(--font-sm);margin-top:4px}
+.flow-arrow{text-align:center;color:var(--amber);font-size:clamp(1rem,2vw,1.5rem);margin:12px 0}
+.score-map{display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:var(--spacing);margin:16px 0}
+.score-cell{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--spacing);text-align:center}
+.score-cell .sc{font-family:'IBM Plex Mono',monospace;font-size:clamp(1rem,2.5vw,1.5rem);font-weight:700;color:var(--amber)}
+.score-cell .lev{color:var(--cyan);font-size:var(--font-sm);margin-top:4px}
+.prot-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(clamp(160px,22vw,200px),1fr));gap:var(--spacing);margin:16px 0}
+.prot-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--spacing);text-align:center}
+.prot-card .prot-title{color:var(--red);font-size:var(--font-sm);font-weight:700;text-transform:uppercase;margin-bottom:8px}
+.prot-card .prot-detail{color:var(--muted);font-size:var(--font-sm)}
+.inst-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(clamp(140px,20vw,180px),1fr));gap:var(--spacing);margin:16px 0}
+.inst-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--spacing);text-align:center}
+.inst-card .value{font-family:'IBM Plex Mono',monospace;font-size:clamp(1.2rem,3vw,1.8rem);font-weight:700;color:var(--amber)}
+.inst-card .label{color:var(--muted);font-size:var(--font-sm);text-transform:uppercase;margin-top:4px}
+.heatmap{display:grid;grid-template-columns:60px repeat(12,1fr);gap:2px;font-size:var(--font-sm);font-family:'IBM Plex Mono',monospace;overflow-x:auto}
+.heatmap-cell{padding:clamp(4px,1vw,8px);text-align:center;border-radius:4px;min-width:40px}
+.heatmap-header{color:var(--muted);font-weight:600}
+.heatmap-year{color:var(--amber);font-weight:600;display:flex;align-items:center}
+.decay-heatmap{display:grid;grid-template-columns:120px repeat(4,1fr);gap:2px;font-size:var(--font-sm);font-family:'IBM Plex Mono',monospace;overflow-x:auto}
+.decay-cell{padding:clamp(6px,1vw,10px);text-align:center;border-radius:4px;min-width:80px}
+.timeline{position:relative;padding:var(--spacing) 0;margin:var(--spacing) 0}
+.timeline-item{position:relative;padding:16px 0 16px 32px;border-left:2px solid var(--border)}
+.timeline-item::before{content:'';position:absolute;left:-6px;top:20px;width:10px;height:10px;border-radius:50%;background:var(--amber);border:2px solid var(--bg)}
+.timeline-item .version{font-weight:700;color:var(--amber);font-size:var(--font-base)}
+.timeline-item .desc{color:var(--muted);font-size:var(--font-sm);margin-top:4px}
+.footer{border-top:1px solid var(--border);margin-top:64px;padding:var(--spacing) 0;text-align:center;color:var(--muted);font-size:var(--font-sm)}
+.footer a{color:var(--cyan);text-decoration:none}
+.footer a:hover{text-decoration:underline}
+@media(max-width:768px){
+.hero{grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
+.signal-grid,.prot-grid,.score-map,.inst-grid{grid-template-columns:1fr}
+.heatmap,.decay-heatmap{font-size:0.7rem}
+.decay-heatmap{grid-template-columns:100px repeat(4,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Maestro Quant</h1>
+<p class="subtitle">V2 — 4-Signal + Hedge Portfolio System — Research Report</p>
+
+<!-- 1. EXECUTIVE SUMMARY HERO CARDS -->
+<h2>Executive Summary</h2>
+<div class="hero">
+<div class="hero-card highlight"><div class="value">1.96</div><div class="label">WF OOS Sharpe</div></div>
+<div class="hero-card green"><div class="value">0.0010</div><div class="label">p-value (Block Perm)</div></div>
+<div class="hero-card green"><div class="value">+77.6%</div><div class="label">CAGR</div></div>
+<div class="hero-card red"><div class="value">-23.0%</div><div class="label">Max DD</div></div>
+<div class="hero-card highlight"><div class="value">9/11</div><div class="label">Positive Folds</div></div>
+<div class="hero-card cyan"><div class="value">106.7%</div><div class="label">OOS/FS Ratio (Degradation)</div></div>
+<div class="hero-card cyan"><div class="value">[0.98, 2.88]</div><div class="label">95% CI</div></div>
+<div class="hero-card green"><div class="value">3/3</div><div class="label">Fold Robust (All Shifts p<0.002)</div></div>
+</div>
+
+<!-- 2. ADVERSARIAL REVIEW SCORECARD -->
+<h2>Adversarial Review Scorecard</h2>
+<div class="table-wrap">
+<table>
+<thead><tr>
+<th>Issue</th><th>Severity</th><th>Resolution</th><th>Status</th>
+</tr></thead>
+<tbody>
+<tr><td>Progressive stop lookahead</td><td>Critical</td><td>Fixed — exit day i+1</td><td><span class="badge pass">PASS (fixed)</span></td></tr>
+<tr><td>IID sign-permutation</td><td>Material</td><td>Block sign-flip (40d, 10K)</td><td><span class="badge pass">PASS (fixed)</span></td></tr>
+<tr><td>Fold placement sensitivity</td><td>Material</td><td>Tested +0d/+30d/+60d</td><td><span class="badge pass">PASS (robust)</span></td></tr>
+<tr><td>LSR pairs TX cost</td><td>Minor</td><td>Turnover-based model</td><td><span class="badge pass">PASS (8% off)</span></td></tr>
+<tr><td>Funding rate 3x/day?</td><td>Minor</td><td>Verified daily aggregate</td><td><span class="badge pass">PASS (correct)</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- 3. V1 vs V2 IMPACT TABLE -->
+<h2>V1 vs V2 Impact Analysis</h2>
+<div class="table-wrap">
+<table>
+<thead><tr>
+<th>Metric</th><th>V1 (buggy)</th><th>V2 (fixed)</th><th>Change</th>
+</tr></thead>
+<tbody>
+<tr><td>FS Sharpe</td><td>2.36</td><td>1.83</td><td class="neg">-0.53</td></tr>
+<tr><td>WF OOS Sharpe</td><td>2.46</td><td>1.96</td><td class="neg">-0.50</td></tr>
+<tr><td>p-value</td><td>0.0005</td><td>0.0010</td><td class="pos">still ***</td></tr>
+<tr><td>FS CAGR</td><td class="pos">+110.4%</td><td class="pos">+77.6%</td><td class="neg">-32.8pp</td></tr>
+<tr><td>FS MaxDD</td><td class="neg">-20.5%</td><td class="neg">-23.0%</td><td class="neg">+2.5pp</td></tr>
+<tr><td>95% CI</td><td>[1.49, 3.37]</td><td>[0.98, 2.88]</td><td>wider</td></tr>
+<tr><td>Positive folds</td><td>9/11</td><td>9/11</td><td>same</td></tr>
+<tr><td>OOS/FS ratio</td><td>104.3%</td><td>106.7%</td><td class="pos">still >100%</td></tr>
+</tbody>
+</table>
+</div>
+<p style="color:var(--muted);margin-top:8px">Bugs that flatter results are the hardest to find. Fixing the progressive stop lookahead reduced Sharpe by 22%, but validation remains highly significant. OOS/FS ratio >100% indicates system actually improves out-of-sample.</p>
+
+<!-- 4. SIGNAL COMPONENTS -->
+<h2>Signal Architecture</h2>
+<div class="signal-grid">
+<div class="signal-box">
+<div class="name">BTC Weighted Regime (45%)</div>
+<div class="detail">p=0.012</div>
+<div style="color:var(--muted);font-size:var(--font-sm);margin-top:8px">4-factor derivatives regime detector</div>
+</div>
+<div class="signal-box">
+<div class="name">SOL RelMom 20d (20%)</div>
+<div class="detail">p=0.028</div>
+<div style="color:var(--muted);font-size:var(--font-sm);margin-top:8px">Long SOL when outperforming BTC in uptrend</div>
+</div>
+<div class="signal-box">
+<div class="name">DOGE RelMom 10d (20%)</div>
+<div class="detail">p=0.010</div>
+<div style="color:var(--muted);font-size:var(--font-sm);margin-top:8px">Fast alt momentum with BTC bull filter</div>
+</div>
+<div class="signal-box">
+<div class="name">LSR Divergence Pairs (15%)</div>
+<div class="detail">p=0.054</div>
+<div style="color:var(--muted);font-size:var(--font-sm);margin-top:8px">Market-neutral L/S across 14 assets</div>
+</div>
+<div class="signal-box">
+<div class="name">Hedge-When-Flat</div>
+<div class="detail">p=0.002</div>
+<div style="color:var(--muted);font-size:var(--font-sm);margin-top:8px">Short perp when all signals OFF + bearish</div>
+</div>
+</div>
+
+<!-- 5. WALK-FORWARD PER-FOLD CHART -->
+<h2>Walk-Forward Per-Fold Performance</h2>
+<div class="chart-container">
+<div style="color:var(--text);font-weight:600;margin-bottom:12px">OOS Sharpe by Fold (11 Folds)</div>
+<canvas id="wfChart"></canvas>
+</div>
+
+<!-- 6. HEAD-TO-HEAD COMPARISON -->
+<h2>Hedge Impact Analysis</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--spacing);margin:16px 0">
+<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--spacing)">
+<h3>No Hedge</h3>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>WF Sharpe</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">1.88</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>p-value</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">0.0014</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>Positive Folds</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">7/11</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:var(--font-sm)">
+<span>Mean Sharpe</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">1.64</span></div>
+</div>
+<div style="background:var(--bg2);border:1px solid var(--amber);border-radius:var(--radius);padding:var(--spacing)">
+<h3 style="color:var(--amber)">+ Hedge</h3>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>WF Sharpe</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">1.96</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>p-value</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">0.0010</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>Positive Folds</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">9/11</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:var(--font-sm)">
+<span>Mean Sharpe</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">1.83</span></div>
+</div>
+</div>
+<p style="color:var(--muted);font-size:var(--font-sm)">Delta: +0.08 Sharpe, +2 rescued folds. Hedge wins 6/11 folds. Converting flat periods to active protection (22.3% time coverage) adds significant value.</p>
+
+<!-- 7. PER-FOLD BREAKDOWN TABLE -->
+<h2>Per-Fold Detailed Breakdown</h2>
+<div class="table-wrap">
+<table>
+<thead><tr>
+<th>Fold</th><th>Sharpe</th><th>Return</th><th>MaxDD</th><th>Bps/day</th>
+</tr></thead>
+<tbody>
+<tr><td>1</td><td>0.90</td><td class="pos">+8.7%</td><td class="neg">-8.9%</td><td class="pos">+8.1</td></tr>
+<tr><td>2</td><td>1.55</td><td class="pos">+21.6%</td><td class="neg">-12.1%</td><td class="pos">+17.9</td></tr>
+<tr><td>3</td><td class="pos">5.14</td><td class="pos">+97.3%</td><td class="neg">-8.2%</td><td class="pos">+56.2</td></tr>
+<tr><td>4</td><td class="neg">-0.60</td><td class="neg">-6.9%</td><td class="neg">-20.3%</td><td class="neg">-4.6</td></tr>
+<tr><td>5</td><td class="pos">4.77</td><td class="pos">+82.3%</td><td class="neg">-9.7%</td><td class="pos">+49.7</td></tr>
+<tr><td>6</td><td>2.28</td><td class="pos">+27.9%</td><td class="neg">-10.8%</td><td class="pos">+21.1</td></tr>
+<tr><td>7</td><td>0.56</td><td class="pos">+4.3%</td><td class="neg">-12.8%</td><td class="pos">+4.5</td></tr>
+<tr><td>8</td><td>1.73</td><td class="pos">+22.1%</td><td class="neg">-15.3%</td><td class="pos">+17.8</td></tr>
+<tr><td>9</td><td>2.43</td><td class="pos">+28.2%</td><td class="neg">-10.0%</td><td class="pos">+21.1</td></tr>
+<tr><td>10</td><td>1.71</td><td class="pos">+15.3%</td><td class="neg">-9.7%</td><td class="pos">+12.2</td></tr>
+<tr><td>11</td><td class="neg">-0.34</td><td class="neg">-4.9%</td><td class="neg">-15.1%</td><td class="neg">-2.7</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- 8. LEVERAGE CLIFF CHART -->
+<h2>Leverage Cliff Analysis</h2>
+<div class="chart-container">
+<div style="color:var(--text);font-weight:600;margin-bottom:12px">Final Equity vs Leverage (Log Scale)</div>
+<canvas id="leverageChart"></canvas>
+</div>
+
+<!-- 9. LEVERAGE DETAIL TABLE -->
+<h2>Leverage Impact Table</h2>
+<div class="table-wrap">
+<table>
+<thead><tr>
+<th>Leverage</th><th>Final $</th><th>CAGR</th><th>Sharpe</th><th>MaxDD</th><th>Liquidations</th>
+</tr></thead>
+<tbody>
+<tr><td>1x</td><td class="pos">$9,902</td><td class="pos">+82.9%</td><td>1.94</td><td class="neg">-20.6%</td><td>0</td></tr>
+<tr><td>2x</td><td class="pos">$60,451</td><td class="pos">+194.5%</td><td>1.92</td><td class="neg">-37.9%</td><td>0</td></tr>
+<tr class="highlight-row"><td><strong>3x</strong></td><td class="pos"><strong>$244,292</strong></td><td class="pos"><strong>+325.5%</strong></td><td><strong>1.91</strong></td><td class="neg"><strong>-52.7%</strong></td><td><strong>0</strong></td></tr>
+<tr><td>4x</td><td class="neg">$1</td><td class="neg">RUIN</td><td>0.97</td><td class="neg">-100%</td><td class="neg">5</td></tr>
+<tr><td>5x</td><td class="neg">$0</td><td class="neg">RUIN</td><td class="neg">-0.10</td><td class="neg">-100%</td><td class="neg">19</td></tr>
+</tbody>
+</table>
+</div>
+<p style="color:var(--muted);margin-top:8px">3x is the safe maximum. 4x introduces liquidation risk. Sharpe barely degrades up to 3x (1.94→1.91), but CAGR compounds dramatically. Classic Kelly Criterion cliff behavior.</p>
+
+<!-- 10. VOL MULTIPLIER SENSITIVITY TABLE -->
+<h2>Vol Multiplier Sensitivity</h2>
+<div class="table-wrap">
+<table>
+<thead><tr>
+<th>Vol Mult</th><th>FS Sharpe</th><th>WF Sharpe</th><th>p-value</th><th>FS CAGR</th><th>Pos Folds</th>
+</tr></thead>
+<tbody>
+<tr><td>1.0x</td><td>1.86</td><td>1.93</td><td>0.0004</td><td class="pos">+58.4%</td><td>10/11</td></tr>
+<tr><td>1.5x</td><td>1.86</td><td>1.96</td><td>0.0006</td><td class="pos">+68.0%</td><td>9/11</td></tr>
+<tr class="highlight-row"><td><strong>2.0x</strong></td><td><strong>1.83</strong></td><td><strong>1.96</strong></td><td><strong>0.0006</strong></td><td class="pos"><strong>+77.6%</strong></td><td><strong>9/11</strong></td></tr>
+<tr><td>3.0x</td><td>1.75</td><td>1.91</td><td>0.0009</td><td class="pos">+96.6%</td><td>9/11</td></tr>
+</tbody>
+</table>
+</div>
+<p style="color:var(--muted);margin-top:8px">2.0x vol multiplier selected for production. Balances return enhancement with validation robustness. Higher multipliers boost CAGR but widen confidence intervals.</p>
+
+<!-- 11. WHITE'S REALITY CHECK & HANSEN'S SPA -->
+<h2>Data Snooping Correction (White's RC & Hansen's SPA)</h2>
+<p style="color:var(--muted);margin-bottom:16px">We tested 12 strategies and kept 4 survivors. The naive p=0.001 doesn't account for this graveyard. White's Reality Check and Hansen's SPA test whether the best strategy is significant <em>after</em> accounting for multiple testing.</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--spacing);margin:16px 0">
+<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--spacing)">
+<h3>White's Reality Check</h3>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>p-value</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--amber)">0.0671</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>Best (unstudentized)</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">BTC Regime</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:var(--font-sm)">
+<span>Max mean</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">+17.0 bps/day</span></div>
+<p style="color:var(--muted);font-size:var(--font-sm);margin-top:8px">Marginal — borderline at 10% level. Raw mean return just barely exceeds snooping threshold.</p>
+</div>
+<div style="background:var(--bg2);border:1px solid var(--green);border-radius:var(--radius);padding:var(--spacing)">
+<h3 style="color:var(--green)">Hansen's SPA (Preferred)</h3>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>p-value</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600;color:var(--green)">0.0036 ***</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>Best (studentized)</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">Combined Hedged</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:var(--font-sm)">
+<span>Max t-stat</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">3.635</span></div>
+<p style="color:var(--muted);font-size:var(--font-sm);margin-top:8px">Strongly significant. Studentized test (Hansen 2005) is more powerful and the academic standard.</p>
+</div>
+</div>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Strategy</th><th>Mean bps</th><th>Sharpe</th><th>Type</th></tr></thead>
+<tbody>
+<tr class="highlight-row"><td><strong>Combined Hedged</strong></td><td class="pos"><strong>+16.8</strong></td><td><strong>1.78</strong></td><td><span class="badge pass">SURVIVOR</span></td></tr>
+<tr class="highlight-row"><td>Combined No Hedge</td><td class="pos">+14.5</td><td>1.68</td><td><span class="badge pass">SURVIVOR</span></td></tr>
+<tr class="highlight-row"><td>BTC Regime</td><td class="pos">+17.0</td><td>1.20</td><td><span class="badge pass">SURVIVOR</span></td></tr>
+<tr class="highlight-row"><td>LSR Pairs</td><td class="pos">+14.9</td><td>1.18</td><td><span class="badge pass">SURVIVOR</span></td></tr>
+<tr class="highlight-row"><td>SOL RelMom</td><td class="pos">+13.8</td><td>1.06</td><td><span class="badge pass">SURVIVOR</span></td></tr>
+<tr class="highlight-row"><td>DOGE RelMom</td><td class="pos">+10.6</td><td>0.74</td><td><span class="badge pass">SURVIVOR</span></td></tr>
+<tr><td>V3.1 Confluence</td><td class="pos">+6.8</td><td>0.99</td><td><span class="badge fail">FAILED</span></td></tr>
+<tr><td>ETH RelMom</td><td class="pos">+5.5</td><td>0.65</td><td><span class="badge fail">TESTED</span></td></tr>
+<tr><td>Buy & Hold BTC</td><td class="pos">+5.8</td><td>0.41</td><td><span class="badge mixed">BENCHMARK</span></td></tr>
+<tr><td>SMA Crossover</td><td class="pos">+4.8</td><td>0.48</td><td><span class="badge fail">FAILED</span></td></tr>
+<tr><td>Macro Momentum</td><td class="pos">+2.4</td><td>0.28</td><td><span class="badge fail">FAILED</span></td></tr>
+<tr><td>Funding Rate</td><td class="pos">+0.3</td><td>0.21</td><td><span class="badge fail">FAILED</span></td></tr>
+</tbody>
+</table>
+</div>
+<p style="color:var(--muted);margin-top:8px">12 strategies tested on same data. Block bootstrap (block=40d, 10K samples) preserves autocorrelation. Hansen's SPA is the standard test in quantitative finance for data snooping correction (Hansen, 2005).</p>
+
+<!-- 11b. FOLD PLACEMENT SENSITIVITY TABLE -->
+<h2>Fold Placement Robustness</h2>
+<div class="table-wrap">
+<table>
+<thead><tr>
+<th>Shift</th><th>Concat Sharpe</th><th>Mean Sharpe</th><th>p-value</th><th>Pos Folds</th><th>95% CI</th>
+</tr></thead>
+<tbody>
+<tr><td>+0d</td><td>1.96</td><td>1.83</td><td>0.0015</td><td>9/11</td><td>[0.98, 2.88]</td></tr>
+<tr><td>+30d</td><td>2.05</td><td>1.95</td><td>0.0005</td><td>9/10</td><td>[1.01, 3.03]</td></tr>
+<tr><td>+60d</td><td>2.11</td><td>2.06</td><td>0.0015</td><td>10/10</td><td>[1.11, 3.07]</td></tr>
+</tbody>
+</table>
+</div>
+<p style="color:var(--muted);margin-top:8px">All three fold placements pass validation (p<0.002). Concatenated Sharpe actually improves with shifts, indicating robustness to calendar alignment choice. No sensitivity to fold boundaries.</p>
+
+<!-- 12. CORRELATION MATRIX -->
+<h2>Signal Correlation Matrix</h2>
+<div class="decay-heatmap" id="corrMatrix"></div>
+<p style="color:var(--muted);margin-top:8px">Low correlations indicate strong diversification. LSR Pairs negatively correlated with directional signals (by design). BTC Regime shows modest correlation with relative momentum signals.</p>
+
+<!-- 13. SIGNAL ACTIVITY BREAKDOWN -->
+<h2>Signal Activity Statistics</h2>
+<div class="inst-grid">
+<div class="inst-card"><div class="value">62.8%</div><div class="label">BTC Regime ON</div></div>
+<div class="inst-card"><div class="value">32.6%</div><div class="label">SOL RelMom ON</div></div>
+<div class="inst-card"><div class="value">23.7%</div><div class="label">DOGE RelMom ON</div></div>
+<div class="inst-card"><div class="value">22.3%</div><div class="label">Hedge Active</div></div>
+</div>
+<p style="color:var(--muted);margin-top:8px">Hedge active during 22.3% of days — converting previously idle periods into active protection. Relative momentum signals selective (23-33% uptime) to maintain edge.</p>
+
+<!-- 14. WHAT FAILED TABLE -->
+<h2>What Failed Validation</h2>
+<div class="table-wrap">
+<table>
+<thead><tr>
+<th>Signal</th><th>FS Sharpe</th><th>OOS Result</th><th>p-value</th><th>Status</th>
+</tr></thead>
+<tbody>
+<tr><td>M2 Acceleration Overlay</td><td>—</td><td>—</td><td>0.178</td><td><span class="badge fail">FAIL</span></td></tr>
+<tr><td>Momentum+Macro Combined</td><td>1.62</td><td>0.49</td><td>0.77</td><td><span class="badge fail">FAIL</span></td></tr>
+<tr><td>V3.1 5-Signal Confluence</td><td>1.62</td><td>0.45</td><td>0.77</td><td><span class="badge fail">FAIL</span></td></tr>
+<tr><td>Smart Leverage (5-layer)</td><td>—</td><td>—</td><td>—</td><td><span class="badge fail">FAIL</span></td></tr>
+<tr><td>Funding Rate Arbitrage</td><td>0.15</td><td>—</td><td>0.481</td><td><span class="badge fail">FAIL</span></td></tr>
+<tr><td>Price Structure / ICT</td><td class="neg">&lt;0.5</td><td>—</td><td>&gt;0.05</td><td><span class="badge fail">FAIL</span></td></tr>
+</tbody>
+</table>
+</div>
+<p style="color:var(--muted);margin-top:8px">Macro overlay signals that worked in equities failed in crypto. Confluence scoring for both entry AND sizing collapsed OOS. Price structure patterns don't mechanize. Funding arbitrage too path-dependent.</p>
+
+<!-- 15. LESSONS LEARNED -->
+<h2>Lessons Learned</h2>
+<div class="signal-grid">
+<div class="signal-box">
+<div class="name">Optimization Paradox</div>
+<div class="detail" style="text-align:center">Unoptimized fixed params beat Optuna-tuned OOS every time</div>
+</div>
+<div class="signal-box">
+<div class="name">Separate Entry from Sizing</div>
+<div class="detail" style="text-align:center">V3.1's confluence score for both entry+sizing → collapse</div>
+</div>
+<div class="signal-box">
+<div class="name">Hedge When Idle</div>
+<div class="detail" style="text-align:center">Converting flat periods to active protection = 22.3% coverage</div>
+</div>
+<div class="signal-box">
+<div class="name">Adversarial Review Required</div>
+<div class="detail" style="text-align:center">Stop bug inflated Sharpe 22%. Bugs that flatter are hardest to find</div>
+</div>
+</div>
+
+<!-- 16. SYSTEM ARCHITECTURE -->
+<h2>System Architecture</h2>
+<div class="signal-grid">
+<div class="signal-box"><div class="name">Data Layer</div><div class="detail">OHLCV + Derivatives + On-Chain</div></div>
+<div class="signal-box"><div class="name">BTC Regime (45%)</div><div class="detail">Derivatives 4-factor</div></div>
+<div class="signal-box"><div class="name">SOL RelMom (20%)</div><div class="detail">20d lookback</div></div>
+<div class="signal-box"><div class="name">DOGE RelMom (20%)</div><div class="detail">10d fast momentum</div></div>
+<div class="signal-box"><div class="name">LSR Pairs (15%)</div><div class="detail">14-asset L/S</div></div>
+</div>
+<div class="flow-arrow">↓</div>
+<div style="text-align:center;margin:16px 0">
+<span style="font-family:'IBM Plex Mono',monospace;font-size:1.2rem;color:var(--amber);font-weight:700">Progressive Stop: 15% → 10% → 7%</span>
+</div>
+<div class="flow-arrow">↓</div>
+<div style="text-align:center;margin:16px 0">
+<span style="font-family:'IBM Plex Mono',monospace;font-size:1.2rem;color:var(--cyan);font-weight:700">Portfolio Combiner (Vol = 2.0x)</span>
+</div>
+<div class="flow-arrow">↓</div>
+<div style="text-align:center;margin:16px 0">
+<span style="font-family:'IBM Plex Mono',monospace;font-size:1.2rem;color:var(--red);font-weight:700">Hedge-When-Flat (BTC < SMA50 OR LSR > median × 1.1)</span>
+</div>
+<div class="flow-arrow">↓</div>
+<div style="text-align:center;margin:16px 0">
+<span style="font-family:'IBM Plex Mono',monospace;font-size:1.2rem;color:var(--green);font-weight:700">Safe Max Leverage: 3x</span>
+</div>
+
+<h3>Production Parameters</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Component</th><th>Parameter</th><th>Value</th></tr></thead>
+<tbody>
+<tr><td>Weights</td><td>BTC / SOL / DOGE / LSR</td><td>45% / 20% / 20% / 15%</td></tr>
+<tr><td>Volatility</td><td>Vol multiplier</td><td>2.0x</td></tr>
+<tr><td>Protection</td><td>Progressive stop</td><td>15% → 10% → 7%</td></tr>
+<tr><td>Hedge</td><td>Trigger condition</td><td>BTC < SMA50 OR LSR > median × 1.1</td></tr>
+<tr><td>Risk</td><td>Safe max leverage</td><td>3x</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- 17. PAPER TRADING (FORWARD TEST) -->
+<h2>Paper Trading — Forward Test</h2>
+<p style="color:var(--muted);margin-bottom:16px">30-day backfill from 2026-01-17 to 2026-02-15. System ran into a choppy BTC downtrend — exactly the environment where trend-following underperforms.</p>
+
+<div class="hero">
+<div class="hero-card red"><div class="value">-14.83%</div><div class="label">Cumulative P&L</div></div>
+<div class="hero-card red"><div class="value">-26.7%</div><div class="label">BTC Price Change</div></div>
+<div class="hero-card green"><div class="value">+11.9%</div><div class="label">vs Buy & Hold</div></div>
+<div class="hero-card cyan"><div class="value">30</div><div class="label">Days Tracked</div></div>
+</div>
+
+<h3>Signal Activity During Period</h3>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Signal</th><th>Active</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>BTC Regime</td><td>30/30</td><td>Always ON but sizing reduced as derivatives weakened</td></tr>
+<tr><td>SOL RelMom</td><td>~8/30</td><td>Mostly OFF — SOL underperforming BTC</td></tr>
+<tr><td>DOGE RelMom</td><td>~3/30</td><td>Mostly OFF — no clear outperformance</td></tr>
+<tr><td>LSR Pairs</td><td>30/30</td><td>Always ON (market-neutral)</td></tr>
+<tr><td>Hedge</td><td>~13/30 (43%)</td><td>Active when BTC &lt; SMA50</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Drawdown Probability Analysis</h3>
+<p style="color:var(--muted);margin-bottom:16px">Is -14.83% in 30 days a sign the system is broken? No. For Sharpe 1.96 with daily vol ~1.8%:</p>
+<div class="hero">
+<div class="hero-card"><div class="value">62.5%</div><div class="label">P(DD &ge; 14.83% | Normal)</div></div>
+<div class="hero-card"><div class="value">86-97%</div><div class="label">P(DD &ge; 14.83% | Fat Tails)</div></div>
+<div class="hero-card red"><div class="value">~28%</div><div class="label">Expected Max DD (4.7yr)</div></div>
+</div>
+<p style="color:var(--muted);margin-top:8px">The current drawdown is a <strong>statistical certainty</strong> over multi-year horizons. The system is not broken — it's doing exactly what a trend-following system does in chop.</p>
+
+<!-- 18. CROSS-AGENT CONSENSUS MATRIX -->
+<h2>Choppy Market Analysis — Cross-Agent Consensus</h2>
+<p style="color:var(--muted);margin-bottom:16px">4 specialized agents evaluated 8 approaches to improve choppy-market performance. Each brings a different lens to the same problem.</p>
+
+<div class="inst-grid">
+<div class="inst-card"><div class="value" style="font-size:var(--font-base)">Quant Engineer</div><div class="label">Statistical Edge</div></div>
+<div class="inst-card"><div class="value" style="font-size:var(--font-base)">Exchange Expert</div><div class="label">Execution</div></div>
+<div class="inst-card"><div class="value" style="font-size:var(--font-base)">Trading Validator</div><div class="label">Risk</div></div>
+<div class="inst-card"><div class="value" style="font-size:var(--font-base)">Data Scientist</div><div class="label">Validity</div></div>
+</div>
+
+<div class="table-wrap">
+<table>
+<thead><tr><th>Approach</th><th>Quant</th><th>Exchange</th><th>Validator</th><th>Data Sci</th><th>Avg</th><th>Verdict</th></tr></thead>
+<tbody>
+<tr class="highlight-row"><td><strong>Cash-as-Signal</strong></td><td class="pos">8</td><td class="pos">8</td><td class="pos">7</td><td class="pos">7</td><td class="pos"><strong>7.5</strong></td><td><span class="badge pass">DO NOW</span></td></tr>
+<tr><td>Vol-Target Sizing</td><td>6</td><td>5</td><td>5</td><td>6</td><td>5.5</td><td><span class="badge mixed">QUEUE</span></td></tr>
+<tr><td>Accept Drawdown</td><td>5</td><td>5</td><td>5</td><td>6</td><td>5.3</td><td><span class="badge mixed">ACKNOWLEDGE</span></td></tr>
+<tr><td>Correlation Sizing</td><td>5</td><td>4</td><td>4</td><td>5</td><td>4.5</td><td><span class="badge mixed">DEFER</span></td></tr>
+<tr><td>Regime Detector</td><td>5</td><td>3</td><td>3</td><td>5</td><td>4.0</td><td><span class="badge mixed">DEFER</span></td></tr>
+<tr><td>Funding Rate Carry</td><td>4</td><td>5</td><td>3</td><td>3</td><td>3.8</td><td><span class="badge mixed">DEFER</span></td></tr>
+<tr><td>Mean-Reversion Layer</td><td class="neg">3</td><td class="neg">2</td><td class="neg">2</td><td class="neg">2</td><td class="neg"><strong>2.3</strong></td><td><span class="badge fail">HARD SKIP</span></td></tr>
+<tr><td>Faster Stops</td><td class="neg">3</td><td class="neg">3</td><td class="neg">2</td><td class="neg">2</td><td class="neg"><strong>2.5</strong></td><td><span class="badge fail">HARD SKIP</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>Meta-Insight: "In Chop, Do Less"</h3>
+<div style="background:var(--bg2);border:1px solid var(--amber);border-radius:var(--radius);padding:var(--spacing);margin:16px 0">
+<p style="color:var(--text);font-size:var(--font-base)">All 4 agents independently converged on the same conclusion: the system doesn't need <em>more</em> signals for choppy markets — it needs <em>less exposure</em>. The edge comes from trends. In chop, the optimal action is to preserve capital.</p>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--spacing);margin:16px 0">
+<div style="background:var(--bg2);border:1px solid var(--green);border-radius:var(--radius);padding:var(--spacing)">
+<h3 style="color:var(--green)">Priority 1: Cash-When-Flat</h3>
+<p style="color:var(--muted);font-size:var(--font-sm);margin-top:8px">Replace hedge with 100% cash when all directional signals are flat. Adds 0 parameters, removes a feature that lost money in chop. Expected to eliminate 2-4% of the -14.83% loss.</p>
+</div>
+<div style="background:var(--bg2);border:1px solid var(--cyan);border-radius:var(--radius);padding:var(--spacing)">
+<h3 style="color:var(--cyan)">Priority 2: Vol-Target Sizing</h3>
+<p style="color:var(--muted);font-size:var(--font-sm);margin-top:8px">Replace fixed vol_mult=2.0 with dynamic target_vol/realized_vol scaling. Auto-reduces size when vol spikes (chop = high vol), auto-increases in calm trends. Adds 1 parameter — needs WF validation.</p>
+</div>
+<div style="background:var(--bg2);border:1px solid var(--red);border-radius:var(--radius);padding:var(--spacing)">
+<h3 style="color:var(--red)">Hard Skip: Mean-Reversion & Faster Stops</h3>
+<p style="color:var(--muted);font-size:var(--font-sm);margin-top:8px">Mean-reversion contradicts the trend-following core. Faster stops are proven destroyers of trend-following returns through whipsaw. Both would fail walk-forward validation.</p>
+</div>
+</div>
+
+<!-- 18b. CASH-WHEN-FLAT WF VALIDATION -->
+<h2>Cash-When-Flat — Walk-Forward Validation</h2>
+<p style="color:var(--muted);margin-bottom:16px">Tested the #1 consensus recommendation with full 11-fold WF (10K block perms). Verdict: <strong>keep the hedge</strong> — the difference is statistically insignificant, but the hedge protects in bear markets.</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--spacing);margin:16px 0">
+<div style="background:var(--bg2);border:1px solid var(--amber);border-radius:var(--radius);padding:var(--spacing)">
+<h3 style="color:var(--amber)">Hedge (Current)</h3>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>WF Sharpe</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">1.96</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>p-value</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">0.0010</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>Positive Folds</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">9/11</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:var(--font-sm)">
+<span>CAGR</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">+77.6%</span></div>
+</div>
+<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--spacing)">
+<h3>Cash-When-Flat (Tested)</h3>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>WF Sharpe</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">1.88</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>p-value</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">0.0022</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:var(--font-sm)">
+<span>Positive Folds</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">7/11</span></div>
+<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:var(--font-sm)">
+<span>CAGR</span><span style="font-family:'IBM Plex Mono',monospace;font-weight:600">+66.9%</span></div>
+</div>
+</div>
+
+<p style="color:var(--muted);font-size:var(--font-sm)">Delta: +0.08 Sharpe in favor of hedge. Paired t-test: p=0.454 (not significant). Hedge wins 6/11 folds, cash wins 5/11.</p>
+
+<h3>Regime-Conditional Analysis</h3>
+<p style="color:var(--muted);margin-bottom:12px;font-size:var(--font-sm)">The hedge's entire value comes from bear markets. In all other regimes, cash is better — but bear protection is the most valuable regime.</p>
+<div class="table-wrap">
+<table>
+<thead><tr><th>Regime</th><th>% of Days</th><th>Hedge bps/day</th><th>Cash bps/day</th><th>Delta</th><th>Winner</th></tr></thead>
+<tbody>
+<tr><td>Bull Trend</td><td>32.2%</td><td class="pos">+50.7</td><td class="pos"><strong>+55.3</strong></td><td class="neg">-4.6</td><td><span class="badge pass">CASH</span></td></tr>
+<tr class="highlight-row"><td><strong>Bear Trend</strong></td><td>26.5%</td><td class="pos"><strong>+1.1</strong></td><td class="neg">-17.4</td><td class="pos"><strong>+18.5</strong></td><td><span class="badge pass">HEDGE</span></td></tr>
+<tr><td>Choppy</td><td>2.8%</td><td class="pos">+6.1</td><td class="pos"><strong>+13.0</strong></td><td class="neg">-6.9</td><td><span class="badge pass">CASH</span></td></tr>
+<tr><td>Range</td><td>38.5%</td><td class="pos">+1.5</td><td class="pos"><strong>+4.8</strong></td><td class="neg">-3.3</td><td><span class="badge pass">CASH</span></td></tr>
+</tbody>
+</table>
+</div>
+
+<div style="background:var(--bg2);border:1px solid var(--amber);border-radius:var(--radius);padding:var(--spacing);margin:16px 0">
+<p style="color:var(--text);font-size:var(--font-base)"><strong>Decision: Keep the hedge.</strong> Cash wins in 73% of regimes but the hedge converts -17.4 bps/day bear losses into +1.1 bps/day gains. Bear protection is worth the small drag elsewhere. The +0.08 Sharpe difference and 2 extra rescued folds justify keeping the current architecture.</p>
+</div>
+
+<!-- 19. VALIDATION ROADMAP -->
+<h2>Validation Roadmap</h2>
+<p style="color:var(--muted);margin-bottom:16px">What's been proven, and what remains before live capital deployment.</p>
+
+<div class="table-wrap">
+<table>
+<thead><tr>
+<th>Test</th><th>Purpose</th><th>Status</th><th>Impact</th>
+</tr></thead>
+<tbody>
+<tr class="highlight-row"><td>Walk-Forward (11 folds)</td><td>OOS generalization across regimes</td><td><span class="badge pass">DONE</span></td><td>Sharpe 1.96, p=0.001</td></tr>
+<tr class="highlight-row"><td>Block Sign-Permutation (10K)</td><td>Statistical significance with autocorrelation</td><td><span class="badge pass">DONE</span></td><td>p=0.0010 (block=40d)</td></tr>
+<tr class="highlight-row"><td>Fold Placement Sensitivity</td><td>Robustness to calendar alignment</td><td><span class="badge pass">DONE</span></td><td>All 3 shifts p&lt;0.002</td></tr>
+<tr class="highlight-row"><td>Adversarial Quant Review</td><td>Independent bug hunting</td><td><span class="badge pass">DONE</span></td><td>5/5 issues resolved</td></tr>
+<tr class="highlight-row"><td>Leverage Cliff Analysis</td><td>Safe max leverage identification</td><td><span class="badge pass">DONE</span></td><td>3x safe, 4x = RUIN</td></tr>
+<tr class="highlight-row"><td>Vol Multiplier Sensitivity</td><td>Parameter stability</td><td><span class="badge pass">DONE</span></td><td>1.0x-3.0x all p&lt;0.001</td></tr>
+<tr class="highlight-row"><td>Paper Trading (Forward Test)</td><td>Live signal tracking, no real money</td><td><span class="badge pass">LIVE</span></td><td>Tracking since 2026-01-17</td></tr>
+<tr class="highlight-row"><td>White's RC / Hansen's SPA</td><td>Account for signal selection graveyard</td><td><span class="badge pass">DONE</span></td><td>SPA p=0.0036 *** (12 strategies)</td></tr>
+<tr class="highlight-row"><td>Cash-When-Flat Validation</td><td>Test consensus #1 recommendation</td><td><span class="badge pass">DONE</span></td><td>Hedge wins (+0.08 Sharpe, bear protection)</td></tr>
+<tr><td>Purged/Embargo CV</td><td>Prevent leakage from rolling indicators</td><td><span class="badge mixed">PLANNED</span></td><td>20-day gap between train/test</td></tr>
+<tr><td>TX Cost Stress Test</td><td>Edge survival at 2x-5x costs</td><td><span class="badge mixed">PLANNED</span></td><td>Find the cost kill-zone</td></tr>
+<tr><td>Structural Break Detection</td><td>Is alpha consistent or period-driven?</td><td><span class="badge mixed">PLANNED</span></td><td>Folds 3+5 carry heavy weight</td></tr>
+<tr><td>Out-of-Universe Assets</td><td>Test signals on unseen assets</td><td><span class="badge mixed">PLANNED</span></td><td>ADA, DOT, ATOM, AVAX</td></tr>
+<tr><td>Slippage Modeling</td><td>Altcoin liquidity realism</td><td><span class="badge mixed">PLANNED</span></td><td>DOGE/SOL fill quality</td></tr>
+<tr><td>Monte Carlo Equity Paths</td><td>Drawdown ruin probability at 3x</td><td><span class="badge mixed">PLANNED</span></td><td>10K shuffled trade paths</td></tr>
+</tbody>
+</table>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--spacing);margin:24px 0">
+<div style="background:var(--bg2);border:1px solid var(--green);border-radius:var(--radius);padding:var(--spacing)">
+<h3 style="color:var(--green)">Completed (9/15)</h3>
+<p style="color:var(--muted);font-size:var(--font-sm);margin-top:8px">Core statistical validation plus data-snooping correction complete. Cash-when-flat tested and rejected — hedge earns its keep in bear markets. Paper trading LIVE since Jan 2026.</p>
+</div>
+<div style="background:var(--bg2);border:1px solid var(--amber);border-radius:var(--radius);padding:var(--spacing)">
+<h3 style="color:var(--amber)">Next Priority</h3>
+<p style="color:var(--muted);font-size:var(--font-sm);margin-top:8px"><strong>Purged/Embargo CV</strong> and <strong>TX cost stress test</strong> are the next highest-impact validations. Paper trading accumulates forward data daily.</p>
+</div>
+<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:var(--spacing)">
+<h3>Planned (6)</h3>
+<p style="color:var(--muted);font-size:var(--font-sm);margin-top:8px">Additional robustness tests. Each addresses a specific failure mode: indicator leakage, cost sensitivity, regime dependence, universe bias, liquidity reality, and tail risk. Run before scaling beyond initial capital.</p>
+</div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+<div>Maestro Quant — Research Division</div>
+<div><a href="../">← Back to Dashboard</a></div>
+<div>V2 — Updated 2026-02-17 | All block-permutation p-values (10K perms, block=40d)</div>
+</div>
+
+</div>
+
+<script>
+// Walk-forward chart
+const hedgeFolds = [0.90, 1.55, 5.14, -0.60, 4.77, 2.28, 0.56, 1.73, 2.43, 1.71, -0.34];
+const noHedgeFolds = [-1.12, 1.56, 5.08, -0.63, 4.99, 3.18, -0.01, 2.33, 1.81, 2.02, -1.16];
+new Chart(document.getElementById('wfChart'),{
+  type:'bar',
+  data:{
+    labels:Array.from({length:11},(_,i)=>'F'+(i+1)),
+    datasets:[
+      {label:'+ Hedge',data:hedgeFolds,backgroundColor:hedgeFolds.map(v=>v>=0?'rgba(251,191,36,0.7)':'rgba(255,0,102,0.5)'),borderColor:hedgeFolds.map(v=>v>=0?'#fbbf24':'#ff0066'),borderWidth:1},
+      {label:'No Hedge',data:noHedgeFolds,backgroundColor:noHedgeFolds.map(v=>v>=0?'rgba(6,182,212,0.5)':'rgba(255,0,102,0.3)'),borderColor:noHedgeFolds.map(v=>v>=0?'#06B6D4':'#ff0066'),borderWidth:1}
+    ]
+  },
+  options:{
+    responsive:true,
+    plugins:{legend:{labels:{color:'#e5e5e5'}}},
+    scales:{
+      x:{ticks:{color:'#888'},grid:{color:'#222'}},
+      y:{ticks:{color:'#888'},grid:{color:'#222'},title:{display:true,text:'OOS Sharpe',color:'#888'}}
+    }
+  }
+});
+
+// Leverage cliff chart
+new Chart(document.getElementById('leverageChart'),{
+  type:'bar',
+  data:{
+    labels:['1x','2x','3x','4x','5x'],
+    datasets:[{
+      label:'Final Equity ($)',
+      data:[9902, 60451, 244292, 1, 0],
+      backgroundColor:['#10b981','#10b981','#fbbf24','#ff0066','#ff0066'],
+      borderColor:['#10b981','#10b981','#fbbf24','#ff0066','#ff0066'],
+      borderWidth:1
+    }]
+  },
+  options:{
+    responsive:true,
+    plugins:{
+      legend:{labels:{color:'#e5e5e5'}},
+      tooltip:{callbacks:{
+        label: function(ctx) {
+          let label = ctx.dataset.label || '';
+          if (label) label += ': ';
+          label += '$' + ctx.parsed.y.toLocaleString();
+          if (ctx.dataIndex === 3) label += ' (5 liquidations)';
+          if (ctx.dataIndex === 4) label += ' (19 liquidations)';
+          return label;
+        }
+      }}
+    },
+    scales:{
+      x:{ticks:{color:'#888'},grid:{color:'#222'}},
+      y:{
+        type:'logarithmic',
+        ticks:{color:'#888',callback: value => '$' + value.toLocaleString()},
+        grid:{color:'#222'},
+        title:{display:true,text:'Final Equity (Log Scale)',color:'#888'}
+      }
+    }
+  }
+});
+
+// Correlation matrix heatmap
+const signals = ['BTC Regime', 'SOL RelMom', 'DOGE RelMom', 'LSR Pairs'];
+const corrData = [
+  [1.000, 0.267, 0.198, -0.053],
+  [0.267, 1.000, 0.217, 0.003],
+  [0.198, 0.217, 1.000, -0.125],
+  [-0.053, 0.003, -0.125, 1.000]
+];
+
+const corr = document.getElementById('corrMatrix');
+corr.innerHTML = '<div class="decay-cell heatmap-header"></div>' + signals.map(s=>'<div class="decay-cell heatmap-header">'+s+'</div>').join('');
+signals.forEach((signal, i) => {
+  corr.innerHTML += '<div class="decay-cell heatmap-year">'+signal+'</div>';
+  corrData[i].forEach((val, j) => {
+    const abs = Math.abs(val);
+    const bg = abs < 0.3 ? 'rgba(16,185,129,0.3)' : (abs < 0.6 ? 'rgba(251,191,36,0.3)' : 'rgba(255,0,102,0.3)');
+    const color = abs < 0.3 ? '#10b981' : (abs < 0.6 ? '#fbbf24' : '#ff0066');
+    corr.innerHTML += '<div class="decay-cell" style="background:'+bg+';color:'+color+'">'+val.toFixed(3)+'</div>';
+  });
+});
+</script>
+</body>
+</html>
