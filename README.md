@@ -1,165 +1,86 @@
-# Maestro
+# Maestro -- Quantitative Crypto Research Platform
 
-*The Master Conductor of Trading Strategies*
-
-A quantitative trading platform for algorithmic strategy development, backtesting, and optimization.
-
-## Overview
-
-Maestro is a comprehensive trading system that enables users to develop, test, and optimize trading strategies using historical market data. The platform provides a web-based interface for strategy evaluation and supports multiple data sources including Binance and BitMEX.
-
-## Architecture
-
-- **Backend**: Python-based API using Flask with RethinkDB for data storage
-- **Frontend**: React.js application with Material-UI components
-- **Database**: RethinkDB for storing market data and strategy results
-- **Containerized**: Docker-based deployment with docker-compose
-
-## Features
-
-- **Strategy Development**: Multiple built-in strategies including:
-  - Bollinger Bands
-  - EMA/MA Cross
-  - MACD
-  - RSI
-  - Ichimoku
-  - Channel strategies
-
-- **Data Sources**: 
-  - Binance market data
-  - BitMEX market data
-  - Real-time and historical data ingestion
-
-- **Analysis Tools**:
-  - Strategy backtesting
-  - Walk-forward optimization
-  - Performance visualization
-  - Risk metrics calculation
-
-- **Web Interface**:
-  - Interactive dashboards
-  - Candlestick charts
-  - P&L visualization
-  - Strategy performance metrics
+Systematic macro-momentum trading system for cryptocurrency perpetual futures. Built on the discovery that M2 money supply acceleration is the dominant predictor of crypto returns.
 
 ## Quick Start
 
-### Prerequisites
-
-- Docker and Docker Compose
-- Git
-
-### Installation
-
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd maestro
+cd ~/Desktop/maestro/backend
+python -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+
+# Run the engine
+python maestro_engine.py
+
+# Start the API
+uvicorn maestro_api:app --port 8001
+
+# Run integration tests
+python maestro_integration_test.py
 ```
 
-2. Start the services:
-```bash
-docker-compose up -d
-```
-
-3. Access the application:
-- Frontend: http://localhost:8080
-- Backend API: http://localhost:5050
-- RethinkDB Admin: http://localhost:8081
-
-## Services
-
-- **maestro-be**: Main backend API service
-- **maestro-fe**: React frontend application
-- **maestro-binance**: Binance data downloader
-- **maestro-bitmex**: BitMEX data downloader
-- **rethinkdb**: Database service
-
-## Development
-
-### Backend Development
-
-The backend is built with Python and includes:
-- Flask REST API
-- Strategy implementations
-- Data processing engines
-- Optimization algorithms
-
-### Frontend Development
-
-The frontend uses:
-- React 16.13.1
-- Material-UI components
-- Highcharts for visualization
-- Recharts for additional charting
-
-### Configuration
-
-Configuration files:
-- `backend/maestro-dev.yaml`: Development configuration
-- `backend/maestro-prd.yaml`: Production configuration
-
-## Research Module (NEW)
-
-Automated strategy research system for cross-asset, cross-timeframe analysis.
-
-### Quick Start
-
-```bash
-# Activate virtual environment
-source .venv/bin/activate
-
-# Run research
-python -m backend.research.cli run \
-  --strategies BollingerBreakout MACD RSI \
-  --assets BTC/USDT ETH/USDT SOL/USDT \
-  --timeframes 1h 4h 1d
-```
-
-### Features
-
-- **Grid Backtesting**: Test strategies across multiple assets and timeframes
-- **Hybrid Strategies**: Auto-generate strategy combinations (e.g., MACD + VolumeFilter)
-- **Pattern Analysis**: Identify what works vs what doesn't
-- **Cross-Asset Tables**: Performance comparison matrices
-
-### Built-in Strategies
-
-| Category | Strategies |
-|----------|------------|
-| Trend Following | MACD, EMA_Cross, SMA_Cross, Momentum |
-| Mean Reversion | RSI, BollingerBreakout, MeanReversion |
-| Volume Based | OBV, VolumeBreakout, CapitulationReversal |
-
-### Sample Output
+## Architecture
 
 ```
-📊 BollingerBreakout
-------------------------------------------------------------
-Asset/TF                 Return %     Sharpe    MaxDD %   Trades
-------------------------------------------------------------
-BTC/USDT/1d              +81.52%     1.0996    -44.48%       12
-ETH/USDT/1d             +104.40%     1.1104    -31.93%        9
-SOL/USDT/1d             +348.35%     1.2500    -27.00%       10
+maestro/
+  backend/
+    datasource/       # 4 data providers (yfinance, FRED, FF, Alpha Vantage)
+    strategies/
+      composite/      # Macro momentum V1-V4 + 6 legacy composites
+    ml/               # Regime classifier, feature engine, signal weighter
+    freqtrade/        # IStrategy port for live trading
+    research/         # Ultrathink scripts, validation studies
+    maestro_engine.py # Core engine (1.2s execution)
+    maestro_api.py    # FastAPI (7 endpoints, 61 tests)
+    maestro_mcp_bridge.py  # Claude MCP integration
+  data/
+    backtest_results/ # JSON results for all strategies
+    optimization/     # Optuna studies and best params
+    research/         # Research notes and blueprints
+    derivatives/      # Coinalyze data (65 tokens, 2yr)
+  docs/               # Reports, architecture, guides
+  frontend/           # React dashboard
 ```
 
-See `backend/research/README.md` for full documentation.
+## Strategies
 
-## API Endpoints
+**66 original strategies** across 6 categories (technical, scalping, momentum, composite, derivatives, hybrids), plus:
 
-The REST API provides endpoints for:
-- Strategy execution and backtesting
-- Data retrieval and management
-- Optimization parameter configuration
-- Performance metrics calculation
+| Strategy | Sharpe | OOS Sharpe | Max DD | Status |
+|----------|--------|------------|--------|--------|
+| V3 Macro Momentum | 1.71 | 0.84 (p=0.036) | -5.5% | Production |
+| V4 Multi-Module | 1.70 | 0.256 | -30.4% | Research only |
+| ML Regime Classifier | -- | 1.33 | -18.2% | Production overlay |
+| FF Bridge | 1.06 | +3.66% WF | -- | Production overlay |
 
-## Contributing
+## Data Sources
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+| Provider | Data | Update |
+|----------|------|--------|
+| yfinance | OHLCV, DXY, Gold, HYG, 10Y | Daily |
+| FRED | M2, CPI, Unemployment, Fed Funds | Monthly |
+| Fama-French | Mkt-RF, SMB, HML, RMW, CMA | Daily |
+| Alpha Vantage | GDP, Treasury Yield, Inflation | Monthly |
 
-## License
+## Key Results
 
-[License information not specified]
+- **M2 acceleration** is THE edge: BTC returns 102.8%/yr when accelerating vs 2.1%/yr when not
+- **Walk-forward validated**: 14/14 folds pass, OOS Sharpe 0.84, p-value 0.036
+- **Crash protection**: 0% loss during COVID, May 2021, FTX
+- **Short alpha**: +23.1% during 2022 bear market
+
+## Documentation
+
+- [Mega Strategy Report](docs/MEGA_STRATEGY_REPORT.md) -- Full research report
+- [File Inventory](docs/FILE_INVENTORY.md) -- Complete file listing
+- [Production Ready](docs/PRODUCTION_READY.md) -- Deployment checklist
+- [Integration Architecture](docs/INTEGRATION_ARCHITECTURE.md) -- System design
+- [Research Findings](docs/RESEARCH_FINDINGS.md) -- Historical findings
+
+## Dashboard
+
+Live at https://virtuosocrypto.com/quant/
+
+---
+
+*Virtuoso Research Division -- 2026*

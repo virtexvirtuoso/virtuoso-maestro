@@ -6,22 +6,22 @@ Quantitative trading platform for algorithmic strategy development, backtesting,
 
 ## Pipeline Documentation
 
-See **docs/PIPELINE.md** for the complete three-stage workflow:
+See **docs/03-developer-guide/architecture/PIPELINE.md** for the complete three-stage workflow:
 - **Maestro** → Walk-forward validation (research)
 - **Jesse** → Derivatives simulation (funding rates)
 - **Freqtrade** → Live execution (free)
 
-See **docs/MODERNIZATION.md** for the 2020→2026 stack upgrade plan (VectorBT, QuestDB, FastAPI, Optuna).
+See **docs/03-developer-guide/architecture/MODERNIZATION.md** for the 2020→2026 stack upgrade plan (VectorBT, QuestDB, FastAPI, Optuna).
 
 ## Quick Reference
 
 | Item | Value |
 |------|-------|
-| Entry Point | `backend/main/rest_api.py` |
+| Entry Point (V1) | `backend/main/rest_api.py` (Flask, port 5050) |
+| Entry Point (V2) | `backend/main/fastapi_app.py` (FastAPI, port 8000) |
 | Config | `backend/config/maestro-dev.yaml` |
-| Database | RethinkDB (localhost:28015) |
-| API Port | 5000 |
-| Frontend | React + Highcharts |
+| Database | RethinkDB (localhost:28015, db: `filos-dev`) |
+| Frontend | React + Material-UI + WebSocket |
 
 ## Architecture
 
@@ -43,6 +43,23 @@ Data Sources (Binance/BitMEX REST API)
          ↓
     Results → RethinkDB → REST API → React UI
 ```
+
+## Component Responsibilities (Critical)
+
+**NEVER violate this separation of concerns:**
+
+| Component | MUST Do | MUST NOT Do |
+|-----------|---------|-------------|
+| DataFeed (`backend/datafeed/`) | Load OHLCV via `DataAdapter`, filter by date, return DataFrame | Query RethinkDB directly from strategies |
+| Engine (`backend/engine_v2/`) | Run vectorized backtests, compute metrics, manage splits | Store results directly (use Storage layer) |
+| Strategy (`backend/strategies/`) | Generate entry/exit signals from price data | Access DB, compute aggregate metrics, apply fees |
+| Storage (`backend/storage/`) | Persist results and progress to RethinkDB | Run backtests or transform data |
+| API (`backend/main/`) | Serve results, accept job requests, stream progress | Compute backtests inline in request handlers |
+
+**Critical anti-patterns:**
+- Strategies accessing RethinkDB directly — always use `DataAdapter.load_dataframe()`
+- Fee/commission applied in both VectorBT `fees` param AND Numba `commission` — pick one, never both
+- Metrics computed outside the engine — all Sharpe/VWR/Sortino must come from engine analyzers
 
 ## Key Directories
 
@@ -132,6 +149,36 @@ config:
         num_splits: 10
 ```
 
+## Environment Variables
+
+**Backend:**
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `CONFIG_FILE` | `maestro-dev.yaml` | YAML config path |
+| `FASTAPI_PORT` | `8000` | FastAPI v2 server port |
+| `COINALYZE_API_KEY` | None | Derivatives strategies (optional) |
+
+**Frontend (`frontend/.env.local`):**
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `REACT_APP_REST_API_V2_URL` | `http://localhost:5050` | FastAPI backend URL |
+| `REACT_APP_WS_HOST` | `localhost:8000` | WebSocket host for progress |
+| `REACT_APP_OPTUNA_DASHBOARD_URL` | `http://localhost:8080` | Optuna dashboard (optional) |
+| `REACT_APP_USE_TRADINGVIEW` | `true` | TradingView chart feature flag |
+
+## Database Schema (RethinkDB)
+
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `trade_{PROVIDER}_{symbol}_{bin_size}` | OHLCV candles | `timestamp, open, high, low, close, volume` |
+| `trade_metadata` | Data catalog | `table_name, provider, symbol, bin_size, start` |
+| `optimization_results` | Backtest/WF results | `tid, test_name, symbol, bin_size, analyzers, observers` |
+| `optimization_progress` | Real-time job status | `tid, status, progress_pct, current_fold, total_folds` |
+
+**Database names:** `filos-dev` (local) / `filos-prd` (Docker) — kept for legacy compatibility.
+
+**No schema validation at DB level** — validators live in FastAPI Pydantic models only.
+
 ## Data Flow
 
 ```
@@ -155,6 +202,18 @@ RethinkDB: optimization_results, optimization_progress
        ↓
 REST API → React Frontend
 ```
+
+## Adding New Data Fields
+
+When adding data to the pipeline, update ALL stages:
+
+1. **Data Source** (`backend/datasource/`) — Fetch from exchange API
+2. **RethinkDB Table** — Store in `trade_{PROVIDER}_{symbol}_{bin_size}`
+3. **DataAdapter** (`backend/datafeed/data_adapter.py`) — Include in DataFrame load
+4. **Engine** (`backend/engine_v2/`) — Consume in backtest if needed
+5. **Result Converter** (`backend/engine_v2/result_converter.py`) — Map to output schema
+6. **API Route** (`backend/main/`) — Expose via endpoint
+7. **Frontend** — Display in React UI
 
 ## Adding New Strategies
 
@@ -181,6 +240,33 @@ CONFIG_FILE=../config/maestro-dev.yaml python rest_api.py
 cd frontend
 npm start
 ```
+
+## Testing
+
+```bash
+# Run all tests (332 items)
+pytest backend/tests/ -v
+
+# Engine tests only
+pytest backend/tests/test_engine_v2.py -v
+
+# V1 vs V2 parity check
+pytest backend/tests/test_engine_parity.py -v
+
+# Specific adapter
+pytest backend/tests/test_data_adapter.py::TestRethinkDBAdapter -v
+```
+
+**Test suites:**
+| File | Coverage |
+|------|----------|
+| `test_engine_v2.py` | VectorBT engine, strategies, walk-forward |
+| `test_engine_parity.py` | V1 (Backtrader) vs V2 (VectorBT) result comparison |
+| `test_data_adapter.py` | RethinkDB/Parquet/QuestDB adapters |
+| `test_vwr_calculation.py` | Variability-Weighted Return metric |
+| `test_result_converter.py` | V2→V1 schema mapping |
+| `test_parquet_cache.py` | DataFrame cache I/O |
+| `test_quantstats_reporter.py` | PyFolio analyzer output |
 
 ## Dependencies
 
@@ -213,6 +299,50 @@ npm start
 | Database | RethinkDB | Memcached/Redis |
 | Optimization | Walk-forward (rolling splits) | Grid search |
 | Strategies | 11 TA-based | 6-dimensional confluence |
+
+## Troubleshooting
+
+| Symptom | Check |
+|---------|-------|
+| RethinkDB connection refused | Is `rethinkdb` process running? Default port 28015 |
+| Empty DataFrame / no data | Verify table exists: `trade_metadata` catalog, check date range filter |
+| Backtest returns zero trades | Strategy too restrictive, or data doesn't cover requested period |
+| NaN in Sharpe/metrics | Division by zero — zero returns or single-trade result |
+| Commission applied twice | VectorBT `fees` param AND Numba `commission` both set — use only one |
+| Walk-forward all splits same params | Parameter grid too narrow — expand search ranges |
+| WebSocket disconnects | Frontend auto-falls back to HTTP polling (2s). Check `FASTAPI_PORT` |
+| Frontend can't reach API | Verify `REACT_APP_REST_API_V2_URL` in `.env.local` matches backend port |
+| Win count off by one | Integer truncation in `result_converter.py:60` — `int(trades * win_rate)` loses fractional wins |
+| Timezone mismatch | RethinkDB returns `utc=True` timestamps — ensure all date filters use UTC |
+
+## Critical Code Warning
+
+**Files that silently corrupt backtest results if modified incorrectly:**
+
+| File | Risk | What to check |
+|------|------|---------------|
+| `backend/engine_v2/vectorbt_engine.py:177-179` | Data alignment | `reindex()` must preserve DatetimeIndex; wrong index type → all-False signals |
+| `backend/utils/time_series_split_rolling.py` | Look-ahead bias | Test set must always come AFTER training set; verify split boundaries |
+| `backend/engine_v2/result_converter.py:60-63` | Win rate truncation | `int(num_trades * win_rate)` loses fractional wins |
+| `backend/engine_v2/vectorbt_engine.py:194` | Fee mode | VectorBT `fees` is percentage (0.001 = 0.1%); changing to absolute breaks everything |
+| `backend/datafeed/data_adapter.py` | Data source swap | Changing adapter selection logic can silently load wrong/empty data |
+
+**BEFORE modifying engine or strategy logic:**
+1. Run `pytest backend/tests/test_engine_parity.py` — confirms V1/V2 produce same results
+2. Check that `shift(1)` is used for crossover signals (prevents look-ahead bias)
+3. Verify fee mode hasn't changed (percentage vs absolute)
+4. Run a known strategy with known results to confirm output hasn't drifted
+
+## API Endpoints (V2 — FastAPI)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/v2/optimization` | POST | Start backtest/walk-forward job |
+| `/api/v2/optimization/{tid}/progress` | GET | Poll job status |
+| `/api/v2/optimization/{tid}/ws` | WS | Real-time progress stream |
+| `/api/v2/optimization/results` | GET | List all results |
+
+**Frontend connection flow:** POST job → connect WebSocket for progress → fallback to HTTP polling (2s) if WS fails → fetch results on completion.
 
 ## Skills (Invoke Proactively)
 
