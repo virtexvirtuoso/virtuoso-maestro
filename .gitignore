@@ -117,3 +117,78 @@ dist
 .pnp.*
 # Legacy Filos archive (large video files)
 docs/legacy/
+
+# ----- Phase 0/CICD cleanup follow-up (2026-04-29) -----
+
+# data/ohlcv/ — leftover scaffolding from a former standalone clone of this repo
+# (nested .git, .venv, Dockerfiles, pyproject.toml, prd.json, etc.).
+# The actual binance_*.csv data is tracked; everything else is local-only.
+data/ohlcv/.git/
+data/ohlcv/.venv/
+data/ohlcv/.claude/
+data/ohlcv/.github/
+data/ohlcv/.mypy_cache/
+data/ohlcv/.pytest_cache/
+data/ohlcv/.ralph-tui/
+data/ohlcv/.ruff_cache/
+data/ohlcv/.dockerignore
+data/ohlcv/.gitignore
+data/ohlcv/Dockerfile*
+data/ohlcv/*.Dockerfile
+data/ohlcv/docker-compose.yaml
+data/ohlcv/deploy.sh
+data/ohlcv/pyproject.toml
+data/ohlcv/requirements*.txt
+data/ohlcv/CLAUDE.md
+data/ohlcv/README.md
+data/ohlcv/prd.json
+data/ohlcv/nginx/
+data/ohlcv/scripts/
+data/ohlcv/tools/
+data/ohlcv/docs/
+data/ohlcv/frontend/
+data/ohlcv/backend/
+data/ohlcv/freqtrade/
+data/ohlcv/data/
+data/ohlcv/archive/
+# New-symbol CSVs (1000BONK_*, 1000PEPE_*) — naming differs from tracked binance_*.csv
+# corpus; treating as local-only until renamed/normalized.
+data/ohlcv/1000BONK_*.csv
+data/ohlcv/1000PEPE_*.csv
+# Aborted rsync sidecars
+data/ohlcv/.*.csv.??????????
+
+# Untracked binary database (3.0M, churns every backtest run)
+backend/data/optuna_studies.db
+
+# Local data dumps (regenerable from APIs / collectors)
+data/coinglass/
+data/derivatives_5m/
+data/factors/
+data/live/
+data/macro/
+data/maestro.duckdb
+data/onchain/
+data/optimization/
+data/orderflow
+data/orderflow/
+data/paper_trader/
+data/research/
+data/spot/
+data/stablecoin/
+data/stocks/
+data/tick_collector
+data/tick_collector/
+data/whale_*.csv
+data/whale_*.parquet
+
+# Top-level operational dirs (contain .env / large user_data) — needs separate review
+/deployment/
+/freqtrade/
+/results/
+
+# backend/deployment/ — operational (contains .env, 145M of logs/history) — needs review
+backend/deployment/
+
+# .gitignore backups created during cleanup runs
+.gitignore.bak.*
