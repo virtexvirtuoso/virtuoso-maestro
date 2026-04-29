@@ -293,6 +293,7 @@ export default function StrategyComparison() {
   const [selectedStrategies, setSelectedStrategies] = useState([]);
   const [strategyResults, setStrategyResults] = useState({});
   const [loading, setLoading] = useState(false);
+  const [inputValue, setInputValue] = useState(''); // Control autocomplete input text
 
   // Fetch available tests on mount
   useEffect(() => {
@@ -377,6 +378,7 @@ export default function StrategyComparison() {
   const handleAddStrategy = (event, newValue) => {
     if (newValue && !selectedStrategies.find((s) => s.tid === newValue.tid)) {
       setSelectedStrategies([...selectedStrategies, newValue]);
+      setInputValue(''); // Clear input after selection
     }
   };
 
@@ -437,6 +439,8 @@ export default function StrategyComparison() {
               getOptionLabel={(option) => option.test_name || option.tid}
               onChange={handleAddStrategy}
               value={null}
+              inputValue={inputValue}
+              onInputChange={(event, newInputValue) => setInputValue(newInputValue)}
               renderInput={(params) => (
                 <TextField
                   {...params}

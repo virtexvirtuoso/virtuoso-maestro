@@ -1,887 +1,200 @@
 {
-  "name": "Maestro Frontend UX Redesign - Professional Trading UI",
-  "branchName": "feature/frontend-ux-redesign",
+  "name": "Maestro Frontend - UX Sprint 4",
+  "branchName": "feature/ux-sprint-4",
   "userStories": [
     {
-      "id": "MAESTRO-UX-P0-LOADING",
-      "title": "UX Phase 0.1: Add Loading States to Dropdowns",
-      "description": "[Frontend][UX][QuickWin] Add skeleton loading states to Provider, Symbol, and Strategy dropdowns. Currently dropdowns appear empty during async fetch, confusing users.",
+      "id": "MAESTRO-S4-001",
+      "title": "Fix Wizard Navigation Bug (P0)",
+      "description": "[Bug][Frontend] OptimizationWizard closes unexpectedly after completing Step 2 (Strategy selection). Root cause: 958-line component with complex useEffect dependencies causing state resets. This is the #1 priority from cross-agent consensus matrix - all 4 agents rated PRIORITY.",
       "acceptanceCriteria": [
-        "PHASE 0 - READ: Read src/components/OptimizationForm.js to understand current state management",
-        "PHASE 0 - STATES: Add loadingProviders, loadingSymbols, loadingStrategies useState hooks",
-        "PHASE 0 - SET_TRUE: Set loading=true before each fetch call",
-        "PHASE 0 - SET_FALSE: Set loading=false in .then() and .catch() blocks",
-        "PHASE 1 - SKELETON: Import Skeleton from @mui/material",
-        "PHASE 1 - RENDER: Render Skeleton variant='rectangular' height={56} when loading",
-        "PHASE 1 - FALLBACK: Show 'Loading...' MenuItem while loading",
-        "TEST - BUILD: npm run build succeeds",
-        "TEST - VISUAL: Refresh page, verify skeleton shows during load",
-        "VALIDATE - NO_FLICKER: Skeleton transitions smoothly to dropdown",
-        "COMMIT - MSG: git commit -m 'ux: add loading states to dropdowns'"
+        "PHASE 0 - PREP: Read frontend/maestro-ui/src/components/OptimizationWizard.js fully (~958 lines)",
+        "PHASE 0 - PREP: Map all useState hooks and their initial values",
+        "PHASE 0 - PREP: Map all useEffect hooks and their dependency arrays - especially lines 156-174 with initialPreset",
+        "PHASE 0 - PREP: Identify which useEffect causes activeStep to reset when it shouldn't",
+        "PHASE 1 - IMPLEMENT: Add console.log to track activeStep changes and identify trigger",
+        "PHASE 1 - IMPLEMENT: Fix the root cause - either guard the useEffect or refactor to useReducer",
+        "PHASE 1 - IMPLEMENT: If using useReducer, create wizardReducer with actions: SET_STEP, UPDATE_FORM_DATA, RESET_WIZARD",
+        "PHASE 1 - IMPLEMENT: Ensure initialPreset changes do NOT reset activeStep to 0",
+        "PHASE 2 - TEST: Run npm run build in frontend/maestro-ui - must succeed with no errors",
+        "PHASE 2 - TEST: Start frontend with npm start, navigate to localhost:3000",
+        "PHASE 2 - TEST: Click '+ New Optimization' button, verify wizard opens at Step 1",
+        "PHASE 2 - TEST: Fill Step 1 fields (provider, symbol, timeframe), click Next - verify Step 2 loads",
+        "PHASE 2 - TEST: Fill Step 2 fields (strategy), click Next - verify Step 3 loads (NOT closing)",
+        "PHASE 2 - TEST: Click Back, verify Step 2 still has selected strategy",
+        "VALIDATE: Complete all 4 steps, click Run - verify optimization starts and toast notification shows"
       ],
       "priority": 1,
-      "passes": true,
+      "passes": false,
+      "dependsOn": [],
+      "trelloCardId": "698f731f10934ad2494fe815",
+      "trelloList": "to-dos",
+      "labels": ["Bug", "Frontend", "P0"],
+      "context": {
+        "affectedFiles": [
+          "frontend/maestro-ui/src/components/OptimizationWizard.js"
+        ],
+        "verifyCommands": {
+          "build": "cd /Users/ffv_macmini/Desktop/maestro/frontend/maestro-ui && npm run build",
+          "lint": "cd /Users/ffv_macmini/Desktop/maestro/frontend/maestro-ui && npm run lint -- --max-warnings=0",
+          "start": "cd /Users/ffv_macmini/Desktop/maestro/frontend/maestro-ui && npm start"
+        },
+        "debugTip": "Add useEffect(() => console.log('activeStep changed:', activeStep), [activeStep]) to track resets",
+        "technicalDebt": "Component is 958 lines - largest in codebase. Consider splitting after fix.",
+        "consensusRating": "All 4 agents (Frontend Dev, Quant, Tech Lead, UX) rated PRIORITY"
+      }
+    },
+    {
+      "id": "MAESTRO-S4-002",
+      "title": "Create useAsyncData Hook for Consistent Loading (P1)",
+      "description": "[Feature][Frontend] Standardize loading states across 50+ instances of loading/isLoading patterns with no shared abstraction. Create reusable hook that provides consistent loading, error, and data state management.",
+      "acceptanceCriteria": [
+        "PHASE 0 - PREP: Run grep -r 'loading' frontend/maestro-ui/src/components/ to find all loading patterns",
+        "PHASE 0 - PREP: Note inconsistent patterns in: DataManagement.js, Home.js, OptimizationForm.js, CandleStickChart.js",
+        "PHASE 0 - PREP: Check if @tanstack/react-query is in package.json (it's installed but unused)",
+        "PHASE 1 - IMPLEMENT: Create frontend/maestro-ui/src/hooks/useAsyncData.js",
+        "PHASE 1 - IMPLEMENT: Export function useAsyncData(fetchFn, deps = []) that returns { data, loading, error, refetch }",
+        "PHASE 1 - IMPLEMENT: Use useState for data/loading/error, useEffect to call fetchFn, useCallback for refetch",
+        "PHASE 1 - IMPLEMENT: Set loading=true before fetch, loading=false in .then()/.catch()",
+        "PHASE 2 - TEST: Update Home.js to use useAsyncData for fetching providers list",
+        "PHASE 2 - TEST: Add <Skeleton variant='rectangular' height={200} /> when loading",
+        "PHASE 2 - TEST: Run npm run build - must succeed",
+        "PHASE 2 - TEST: Refresh Home page, verify skeleton shows briefly then content loads",
+        "VALIDATE: No layout shift when data loads - skeleton and content have same dimensions"
+      ],
+      "priority": 2,
+      "passes": false,
       "dependsOn": [],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "QuickWin"
-      ],
-      "context": {
-        "rationale": "Users see empty dropdowns during load - looks broken",
-        "affectedFiles": [
-          "frontend/maestro-ui/src/components/OptimizationForm.js"
-        ],
-        "verifyCommands": {
-          "build": "cd frontend/maestro-ui && npm run build",
-          "start": "cd frontend/maestro-ui && npm start"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P0-DEPENDENCY",
-      "title": "UX Phase 0.2: Disable Symbol Until Provider Selected",
-      "description": "[Frontend][UX][QuickWin] Symbol dropdown should be disabled until Provider is selected. Add helper text explaining the dependency.",
-      "acceptanceCriteria": [
-        "PHASE 0 - READ: Read OptimizationForm.js symbol select component",
-        "PHASE 0 - DISABLED: Add disabled={!provider || loadingSymbols} to Symbol Select",
-        "PHASE 0 - HELPER: Add FormHelperText 'Select a provider first' when !provider",
-        "PHASE 0 - CLEAR: Clear symbol state when provider changes: setSymbol('')",
-        "TEST - DISABLED: On load, verify Symbol dropdown is disabled and greyed out",
-        "TEST - ENABLED: Select Provider, verify Symbol enables and populates",
-        "VALIDATE - HELPER: Helper text appears when disabled",
-        "COMMIT - MSG: git commit -m 'ux: disable symbol until provider selected'"
-      ],
-      "priority": 2,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P0-LOADING"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "QuickWin"
-      ],
+      "labels": ["Feature", "Frontend", "P1"],
       "context": {
         "affectedFiles": [
-          "frontend/maestro-ui/src/components/OptimizationForm.js"
+          "frontend/maestro-ui/src/hooks/useAsyncData.js",
+          "frontend/maestro-ui/src/components/Home.js"
         ],
         "verifyCommands": {
-          "test": "Open form, verify symbol disabled until provider selected"
-        }
-      },
-      "completionNotes": "Completed by agent"
+          "build": "cd /Users/ffv_macmini/Desktop/maestro/frontend/maestro-ui && npm run build",
+          "lint": "cd /Users/ffv_macmini/Desktop/maestro/frontend/maestro-ui && npm run lint -- --max-warnings=0",
+          "checkHook": "test -f /Users/ffv_macmini/Desktop/maestro/frontend/maestro-ui/src/hooks/useAsyncData.js && echo 'Hook exists'"
+        },
+        "hookTemplate": "export function useAsyncData(fetchFn, deps = []) { const [state, setState] = useState({ data: null, loading: true, error: null }); useEffect(() => { fetchFn().then(data => setState({ data, loading: false, error: null })).catch(error => setState({ data: null, loading: false, error })); }, deps); return { ...state, refetch: () => fetchFn() }; }",
+        "alternativeApproach": "Could also use @tanstack/react-query useQuery for caching benefits",
+        "consensusRating": "3 of 4 agents (Frontend Dev, Tech Lead, UX) rated PRIORITY"
+      }
     },
     {
-      "id": "MAESTRO-UX-P0-HELPER",
-      "title": "UX Phase 0.3: Add Helper Text to Cash and Commission Fields",
-      "description": "[Frontend][UX][QuickWin] Add helpful context to Cash and Commission fields. Show $ prefix, % suffix, and explanatory helper text.",
+      "id": "MAESTRO-S4-003",
+      "title": "Add CSV Export Backend Endpoint (P2)",
+      "description": "[Feature][Backend] Add REST endpoint to export optimization results as CSV for external analysis in Python/R/Excel. Quants rated this 10/10 - critical for professional workflow.",
       "acceptanceCriteria": [
-        "PHASE 0 - CASH_PREFIX: Add InputAdornment position='start' with '$' to Cash field",
-        "PHASE 0 - CASH_HELPER: Add helperText='Initial portfolio value for simulation'",
-        "PHASE 0 - COMM_SUFFIX: Add InputAdornment position='end' with '%' to Commissions field",
-        "PHASE 0 - COMM_HELPER: Add helperText='Typical: 0.05-0.20% for crypto exchanges'",
-        "PHASE 0 - TOOLTIP: Wrap Commission field with Tooltip explaining fee calculation",
-        "TEST - VISUAL: Verify $ and % appear in fields",
-        "TEST - HELPER: Verify helper text shows below each field",
-        "VALIDATE - TOOLTIP: Hover Commission, verify tooltip appears",
-        "COMMIT - MSG: git commit -m 'ux: add helper text to cash and commission fields'"
+        "PHASE 0 - PREP: Read backend/main/rest_api.py to understand Flask endpoint patterns",
+        "PHASE 0 - PREP: Find existing /optimization/results/<tid> endpoint as reference",
+        "PHASE 0 - PREP: Check RethinkDB optimization_results table schema for available fields",
+        "PHASE 1 - IMPLEMENT: Import csv and io modules at top of rest_api.py",
+        "PHASE 1 - IMPLEMENT: Add route @app.route('/optimization/results/<tid>/export/csv', methods=['GET'])",
+        "PHASE 1 - IMPLEMENT: Query optimization_results table: r.db('filos-dev').table('optimization_results').get(tid)",
+        "PHASE 1 - IMPLEMENT: Extract key metrics: test_name, strategy, symbol, bin_size, sharpe_ratio, total_pnl, win_rate, max_drawdown",
+        "PHASE 1 - IMPLEMENT: Write to StringIO with csv.writer, return Response(output.getvalue(), mimetype='text/csv')",
+        "PHASE 1 - IMPLEMENT: Add Content-Disposition header: response.headers['Content-Disposition'] = f'attachment; filename={test_name}.csv'",
+        "PHASE 2 - TEST: Start backend with python rest_api.py",
+        "PHASE 2 - TEST: Get a valid tid from /optimization/results endpoint",
+        "PHASE 2 - TEST: curl -s http://localhost:5050/optimization/results/{tid}/export/csv - verify CSV output",
+        "VALIDATE: CSV has header row and data row with correct values matching the optimization result"
       ],
       "priority": 3,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P0-DEPENDENCY"
-      ],
+      "passes": false,
+      "dependsOn": [],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "QuickWin"
-      ],
+      "labels": ["Feature", "Backend", "P2"],
       "context": {
         "affectedFiles": [
-          "frontend/maestro-ui/src/components/OptimizationForm.js"
-        ],
-        "verifyCommands": {
-          "test": "View form, verify $ prefix on Cash, % suffix on Commission"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P0-BUTTON",
-      "title": "UX Phase 0.4: Replace Icon Button with Proper Submit Button",
-      "description": "[Frontend][UX][QuickWin] Replace the play icon-only button with a proper 'Run Optimization' button with text, loading state, and disabled state.",
-      "acceptanceCriteria": [
-        "PHASE 0 - REPLACE: Replace IconButton with MUI Button variant='contained' color='primary'",
-        "PHASE 0 - TEXT: Button text 'Run Optimization'",
-        "PHASE 0 - ICON: Add PlayArrowIcon as startIcon",
-        "PHASE 0 - LOADING: When isRunning, show CircularProgress size={20} as startIcon, text 'Running...'",
-        "PHASE 0 - DISABLED: disabled={!isFormValid || isRunning}",
-        "PHASE 1 - VALIDATE: Create isFormValid computed: provider && symbol && strategy",
-        "TEST - DISABLED: On load with empty form, button should be disabled",
-        "TEST - ENABLED: Fill all required fields, button should enable",
-        "TEST - LOADING: Click button, verify loading spinner appears",
-        "VALIDATE - TEXT: Button clearly says 'Run Optimization' not just an icon",
-        "COMMIT - MSG: git commit -m 'ux: replace icon button with proper submit button'"
-      ],
-      "priority": 4,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P0-HELPER"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "QuickWin"
-      ],
-      "context": {
-        "affectedFiles": [
-          "frontend/maestro-ui/src/components/OptimizationForm.js"
-        ],
-        "verifyCommands": {
-          "test": "View form, verify button has text not just icon"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P0-CHART",
-      "title": "UX Phase 0.5: Fix Chart to Show Empty State",
-      "description": "[Frontend][UX][QuickWin] CandleStickChart shows hardcoded XBTUSD data even when nothing selected. Fix to show empty state or load based on form selection.",
-      "acceptanceCriteria": [
-        "PHASE 0 - READ: Read src/components/CandleStickChart.js and Home.js",
-        "PHASE 0 - PROPS: Modify CandleStickChart to accept provider, symbol, timeframe props",
-        "PHASE 0 - GUARD: If !provider || !symbol, return EmptyChartState component",
-        "PHASE 0 - EMPTY_STATE: Create EmptyChartState with icon, 'Select data source to view chart' message",
-        "PHASE 1 - DYNAMIC: Use props to construct fetch URL: /datasource/${provider}/${symbol}/${timeframe}",
-        "PHASE 1 - ERROR: On fetch error, show error state with retry button",
-        "PHASE 1 - LOADING: Show Skeleton while loading",
-        "TEST - EMPTY: On load with no selection, verify empty state shows",
-        "TEST - DYNAMIC: Select provider+symbol, verify chart loads correct data",
-        "VALIDATE - ERROR: Block API, verify error state with retry button",
-        "COMMIT - MSG: git commit -m 'ux: fix chart to show empty state and load dynamically'"
-      ],
-      "priority": 5,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P0-BUTTON"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "QuickWin"
-      ],
-      "context": {
-        "rationale": "Chart shows XBTUSD even when user selects different data - misleading",
-        "affectedFiles": [
-          "frontend/maestro-ui/src/components/CandleStickChart.js",
-          "frontend/maestro-ui/src/components/Home.js"
-        ],
-        "verifyCommands": {
-          "test": "Load home, verify chart shows empty state not XBTUSD"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P1-DASHBOARD",
-      "title": "UX Phase 1.1: Create Data-Aware Dashboard Home",
-      "description": "[Frontend][UX] Redesign Home page to show data source cards with real provider/symbol counts. Replace form-first layout with dashboard-first layout.",
-      "acceptanceCriteria": [
-        "PHASE 0 - READ: Read src/components/Home.js current layout",
-        "PHASE 0 - CONTEXT: Create src/context/DataSourceContext.js to fetch and cache available providers/symbols",
-        "PHASE 0 - HOOK: Export useDataSources() hook returning { providers, symbols, strategies, loading, error }",
-        "PHASE 1 - STATS_ROW: Create stats row showing: 6 Providers, 31 Symbols, 65 Strategies, X Optimizations",
-        "PHASE 1 - PROVIDER_CARDS: Create grid of provider cards showing name, symbol count, sample symbols",
-        "PHASE 1 - CARD_DATA: Use real data from config: Binance(20), BitMEX(1), Bybit(2), MEXC(5), KuCoin(2), Gate(1)",
-        "PHASE 1 - STRATEGY_SIDEBAR: Show strategy categories with counts: Technical(19), Hybrids(15), Derivatives(11), etc.",
-        "PHASE 2 - CTA: Add '+ New Optimization' button that opens wizard modal",
-        "PHASE 2 - RECENT: Show 'Recent Optimizations' section (empty state if none)",
-        "TEST - LOAD: Navigate to home, verify provider cards load with real data",
-        "TEST - COUNTS: Verify symbol counts match config: 31 total",
-        "VALIDATE - RESPONSIVE: Cards stack on mobile",
-        "COMMIT - MSG: git commit -m 'feat(frontend): redesign home with data-aware dashboard'"
-      ],
-      "priority": 6,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P0-CHART"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "Feature"
-      ],
-      "context": {
-        "rationale": "Current home shows empty form - new users need to see what data is available",
-        "affectedFiles": [
-          "frontend/maestro-ui/src/components/Home.js",
-          "frontend/maestro-ui/src/context/DataSourceContext.js (new)"
-        ],
-        "realData": {
-          "providers": {
-            "binance": 20,
-            "bitmex": 1,
-            "bybit": 2,
-            "mexc": 5,
-            "kucoin": 2,
-            "gate": 1
-          },
-          "totalSymbols": 31,
-          "totalStrategies": 65,
-          "strategyCategories": {
-            "technical": 19,
-            "hybrids": 15,
-            "derivatives": 11,
-            "scalping": 8,
-            "momentum": 6,
-            "composite": 6
-          }
-        },
-        "verifyCommands": {
-          "test": "Navigate to home, verify 6 provider cards with correct counts"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P1-SYMBOLS",
-      "title": "UX Phase 1.2: Create Symbol Chip Selector",
-      "description": "[Frontend][UX] Replace Symbol dropdown with clickable chip grid for better visual selection. Show all symbols for selected provider as chips.",
-      "acceptanceCriteria": [
-        "PHASE 0 - CREATE: Create src/components/SymbolChipSelector.js",
-        "PHASE 0 - PROPS: Accept provider, value, onChange, disabled props",
-        "PHASE 0 - CHIPS: Render all symbols for provider as Chip components",
-        "PHASE 0 - SELECTED: Selected chip gets variant='filled' color='primary'",
-        "PHASE 0 - UNSELECTED: Unselected chips get variant='outlined'",
-        "PHASE 1 - GRID: Use flex-wrap layout with gap",
-        "PHASE 1 - LOADING: Show skeleton chips while loading",
-        "PHASE 1 - CLICK: onClick calls onChange with symbol value",
-        "PHASE 2 - INTEGRATE: Replace Symbol Select in OptimizationForm with SymbolChipSelector",
-        "PHASE 2 - SCROLL: Add max-height with overflow-y scroll if >12 symbols",
-        "TEST - BINANCE: Select Binance, verify 20 symbol chips appear",
-        "TEST - SELECT: Click ETHUSDT chip, verify it highlights",
-        "TEST - SWITCH: Switch provider, verify chips update",
-        "VALIDATE - VISUAL: Chips look clickable and selected state is clear",
-        "COMMIT - MSG: git commit -m 'feat(frontend): add symbol chip selector'"
-      ],
-      "priority": 7,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P1-DASHBOARD"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "Feature"
-      ],
-      "context": {
-        "affectedFiles": [
-          "frontend/maestro-ui/src/components/SymbolChipSelector.js (new)",
-          "frontend/maestro-ui/src/components/OptimizationForm.js"
-        ],
-        "binanceSymbols": [
-          "btcusdt",
-          "ethusdt",
-          "solusdt",
-          "cgptusdt",
-          "zecusdt",
-          "sentusdt",
-          "cocosusdt",
-          "renderusdt",
-          "fetusdt",
-          "taousdt",
-          "arbusdt",
-          "opusdt",
-          "suiusdt",
-          "tiausdt",
-          "injusdt",
-          "linkusdt",
-          "avaxusdt",
-          "ethbtc",
-          "ltcbtc",
-          "zecbtc",
-          "chzbtc",
-          "iostbtc"
-        ],
-        "verifyCommands": {
-          "test": "Select Binance, verify chips appear for all 20 symbols"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P2-WIZARD",
-      "title": "UX Phase 2.1: Create Optimization Wizard Modal",
-      "description": "[Frontend][UX][Major] Create 4-step wizard modal for new optimizations. Progressive disclosure reduces cognitive load.",
-      "acceptanceCriteria": [
-        "PHASE 0 - CREATE: Create src/components/OptimizationWizard.js",
-        "PHASE 0 - MODAL: Use MUI Dialog fullWidth maxWidth='md'",
-        "PHASE 0 - STEPPER: Add Stepper with 4 steps: Data Source, Strategy, Settings, Review",
-        "PHASE 0 - STATE: Track currentStep, formData object",
-        "PHASE 1 - STEP1: Data Source - Provider cards, Symbol chips, Timeframe buttons, Date range",
-        "PHASE 1 - STEP2: Strategy - Category tabs, Strategy list, Parameter inputs with descriptions",
-        "PHASE 1 - STEP3: Settings - Optimization type cards, Cash/Commission with helper text, WFO settings",
-        "PHASE 1 - STEP4: Review - Summary table, Test name input, Run button",
-        "PHASE 2 - NAV: Back/Next buttons, Next disabled until step valid",
-        "PHASE 2 - PROGRESS: Step indicator shows completed/active/pending states",
-        "PHASE 2 - SUBMIT: On Run, call POST /optimization/new/ with formData",
-        "PHASE 2 - CLOSE: ESC key and X button close wizard",
-        "TEST - OPEN: Click '+ New Optimization', verify wizard opens",
-        "TEST - NAVIGATE: Complete each step, verify Next enables",
-        "TEST - BACK: Go back, verify previous selections preserved",
-        "TEST - SUBMIT: Complete wizard, verify API called with correct data",
-        "VALIDATE - VALIDATION: Cannot proceed without required fields",
-        "COMMIT - MSG: git commit -m 'feat(frontend): add optimization wizard modal'"
-      ],
-      "priority": 8,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P1-SYMBOLS"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "Major"
-      ],
-      "context": {
-        "rationale": "Current 10+ field form is overwhelming - wizard breaks it into digestible steps",
-        "affectedFiles": [
-          "frontend/maestro-ui/src/components/OptimizationWizard.js (new)",
-          "frontend/maestro-ui/src/components/Home.js"
-        ],
-        "wizardSteps": {
-          "step1_dataSource": [
-            "provider",
-            "symbol",
-            "timeframe",
-            "startDate",
-            "endDate"
-          ],
-          "step2_strategy": [
-            "strategy",
-            "strategyParams"
-          ],
-          "step3_settings": [
-            "optimizationType",
-            "cash",
-            "commissions",
-            "numSplits",
-            "wfoMode"
-          ],
-          "step4_review": [
-            "testName"
-          ]
-        },
-        "verifyCommands": {
-          "test": "Open wizard, complete all 4 steps, verify optimization starts"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P2-STRATEGY",
-      "title": "UX Phase 2.2: Create Strategy Category Tabs",
-      "description": "[Frontend][UX] Replace Strategy dropdown with tabbed category view. Show 6 category tabs with strategy list below.",
-      "acceptanceCriteria": [
-        "PHASE 0 - CREATE: Create src/components/StrategyCategorySelector.js",
-        "PHASE 0 - TABS: Tabs for Technical(19), Hybrids(15), Derivatives(11), Scalping(8), Momentum(6), Composite(6)",
-        "PHASE 0 - LIST: Below tabs, show list of strategies in selected category",
-        "PHASE 0 - ROW: Each strategy row shows name and description",
-        "PHASE 0 - SELECTED: Selected strategy has highlighted background",
-        "PHASE 1 - ENDPOINT: Fetch from /strategy/available and /strategy/{name}/description",
-        "PHASE 1 - CACHE: Cache strategy list in DataSourceContext",
-        "PHASE 1 - CLICK: onClick calls onChange with strategy name",
-        "PHASE 2 - SEARCH: Add search TextField to filter strategies",
-        "PHASE 2 - SCROLL: Add max-height with overflow scroll for long lists",
-        "TEST - TABS: Click each tab, verify correct strategies appear",
-        "TEST - SELECT: Click strategy row, verify it highlights",
-        "TEST - SEARCH: Type 'MACD', verify matching strategies filter",
-        "VALIDATE - COUNTS: Tab counts match: 19+15+11+8+6+6 = 65 total",
-        "COMMIT - MSG: git commit -m 'feat(frontend): add strategy category tabs'"
-      ],
-      "priority": 9,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P2-WIZARD"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "Feature"
-      ],
-      "context": {
-        "affectedFiles": [
-          "frontend/maestro-ui/src/components/StrategyCategorySelector.js (new)",
-          "frontend/maestro-ui/src/components/OptimizationWizard.js"
-        ],
-        "categories": [
-          "technical",
-          "hybrids",
-          "derivatives",
-          "scalping",
-          "momentum",
-          "composite"
-        ],
-        "verifyCommands": {
-          "test": "Open wizard step 2, verify 6 tabs with correct counts"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P2-PARAMS",
-      "title": "UX Phase 2.3: Add Strategy Parameter Descriptions",
-      "description": "[Frontend][UX] Enhance strategy parameter inputs with descriptions, ranges, and validation hints.",
-      "acceptanceCriteria": [
-        "PHASE 0 - ENDPOINT: Create backend endpoint GET /strategy/{name}/params/metadata returning param descriptions",
-        "PHASE 0 - SCHEMA: Return {param_name: {value, min, max, description, step}}",
-        "PHASE 1 - CREATE: Create src/components/StrategyParamEditor.js",
-        "PHASE 1 - FETCH: Fetch param metadata when strategy changes",
-        "PHASE 1 - RENDER: Render TextField for each param with helperText=description",
-        "PHASE 1 - RANGE: Add inputProps={{min, max, step}} for validation",
-        "PHASE 1 - TOOLTIP: Wrap each param with Tooltip showing range",
-        "PHASE 2 - SLIDER: For bounded params, optionally show Slider below TextField",
-        "PHASE 2 - DEFAULT: Show default value in placeholder",
-        "TEST - ICHIMOKU: Select Ichimoku, verify Tenkan(9), Kijun(26), SenkouB(52) params appear",
-        "TEST - DESCRIPTIONS: Verify each param shows description as helper text",
-        "TEST - VALIDATION: Enter value outside range, verify error state",
-        "VALIDATE - FALLBACK: If endpoint fails, show params without descriptions",
-        "COMMIT - MSG: git commit -m 'feat(frontend): add strategy parameter descriptions'"
-      ],
-      "priority": 10,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P2-STRATEGY"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "Feature"
-      ],
-      "context": {
-        "affectedFiles": [
-          "frontend/maestro-ui/src/components/StrategyParamEditor.js (new)",
           "backend/main/rest_api.py"
         ],
-        "exampleParams": {
-          "ichimoku": {
-            "tenkan_period": {
-              "value": 9,
-              "min": 5,
-              "max": 20,
-              "description": "Conversion line period (7-14 typical)"
-            },
-            "kijun_period": {
-              "value": 26,
-              "min": 15,
-              "max": 40,
-              "description": "Base line period (20-30 typical)"
-            },
-            "senkou_b_period": {
-              "value": 52,
-              "min": 30,
-              "max": 80,
-              "description": "Leading span B period (40-60 typical)"
-            }
-          }
+        "verifyCommands": {
+          "getResults": "curl -s http://localhost:5050/optimization/results | jq '.[0].tid'",
+          "testExport": "TID=$(curl -s http://localhost:5050/optimization/results | jq -r '.[0].tid') && curl -s http://localhost:5050/optimization/results/$TID/export/csv",
+          "checkPython": "cd /Users/ffv_macmini/Desktop/maestro/backend/main && python -c 'import rest_api; print(\"OK\")'"
         },
-        "verifyCommands": {
-          "test": "Select Ichimoku, verify params show with descriptions and ranges"
-        }
-      },
-      "completionNotes": "Completed by agent"
+        "csvColumns": ["test_name", "strategy", "symbol", "timeframe", "sharpe_ratio", "total_pnl", "win_rate", "total_trades", "max_drawdown"],
+        "flaskPattern": "@app.route('/optimization/results/<tid>/export/csv')\ndef export_csv(tid): ...",
+        "notes": "Backend runs on port 5050. Database is filos-dev in RethinkDB.",
+        "consensusRating": "Quant rated 10/10 PRIORITY"
+      }
     },
     {
-      "id": "MAESTRO-UX-P3-TIMEFRAME",
-      "title": "UX Phase 3.1: Create Timeframe Button Group",
-      "description": "[Frontend][UX] Replace Timeframe dropdown with button group for quick visual selection.",
+      "id": "MAESTRO-S4-004",
+      "title": "Add Export Button to Evaluation Page (P2)",
+      "description": "[Feature][Frontend] Add export button to Evaluation page that downloads optimization results as CSV. Completes the export functionality by providing UI for the backend endpoint.",
       "acceptanceCriteria": [
-        "PHASE 0 - CREATE: Create src/components/TimeframeSelector.js",
-        "PHASE 0 - BUTTONS: ToggleButtonGroup with buttons: 1m, 5m, 15m, 1h, 4h, 1d",
-        "PHASE 0 - EXCLUSIVE: exclusive prop ensures single selection",
-        "PHASE 0 - SELECTED: Selected button gets primary color",
-        "PHASE 1 - AVAILABLE: Gray out/disable timeframes not available for selected symbol",
-        "PHASE 1 - TOOLTIP: Tooltip on disabled buttons: 'Not available for this symbol'",
-        "PHASE 2 - INTEGRATE: Replace TimeFrame Select in OptimizationForm/Wizard with TimeframeSelector",
-        "TEST - SELECT: Click 4h button, verify it selects",
-        "TEST - DISABLED: Select symbol with limited timeframes, verify unavailable are disabled",
-        "VALIDATE - VISUAL: Buttons clearly show selected state",
-        "COMMIT - MSG: git commit -m 'feat(frontend): add timeframe button group'"
+        "PHASE 0 - PREP: Read frontend/maestro-ui/src/components/Evaluation.js",
+        "PHASE 0 - PREP: Identify the page header/toolbar area where buttons are placed",
+        "PHASE 0 - PREP: Note how tid is obtained from URL params (useParams or similar)",
+        "PHASE 1 - IMPLEMENT: Import FileDownloadIcon from '@mui/icons-material/FileDownload'",
+        "PHASE 1 - IMPLEMENT: Import Button or IconButton from '@mui/material'",
+        "PHASE 1 - IMPLEMENT: Add export button near other action buttons in header",
+        "PHASE 1 - IMPLEMENT: Create handleExport async function",
+        "PHASE 1 - IMPLEMENT: Fetch from `${API_URL}/optimization/results/${tid}/export/csv`",
+        "PHASE 1 - IMPLEMENT: Convert response to blob, create object URL, trigger download via anchor element",
+        "PHASE 2 - TEST: Run npm run build - must succeed",
+        "PHASE 2 - TEST: Navigate to Evaluation page for any completed optimization",
+        "PHASE 2 - TEST: Click export button, verify browser downloads CSV file",
+        "VALIDATE: Open downloaded CSV in spreadsheet app - verify data matches displayed results"
       ],
-      "priority": 11,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P2-PARAMS"
-      ],
+      "priority": 4,
+      "passes": false,
+      "dependsOn": ["MAESTRO-S4-003"],
       "trelloCardId": null,
       "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "Feature"
-      ],
+      "labels": ["Feature", "Frontend", "P2"],
       "context": {
         "affectedFiles": [
-          "frontend/maestro-ui/src/components/TimeframeSelector.js (new)",
-          "frontend/maestro-ui/src/components/OptimizationWizard.js"
-        ],
-        "timeframes": [
-          "1m",
-          "5m",
-          "15m",
-          "1h",
-          "4h",
-          "1d"
+          "frontend/maestro-ui/src/components/Evaluation.js"
         ],
         "verifyCommands": {
-          "test": "View timeframe selector, click buttons to select"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P3-OPTTYPE",
-      "title": "UX Phase 3.2: Create Optimization Type Cards",
-      "description": "[Frontend][UX] Replace Optimization Type radio buttons with visual cards showing descriptions.",
-      "acceptanceCriteria": [
-        "PHASE 0 - CREATE: Create src/components/OptimizationTypeSelector.js",
-        "PHASE 0 - CARDS: 3 cards: Backtest, Walk-Forward, Both",
-        "PHASE 0 - DESCRIPTIONS: Each card shows type name and short description",
-        "PHASE 0 - BACKTEST: 'Single pass with fixed parameters'",
-        "PHASE 0 - WALKFORWARD: 'Rolling optimization (recommended)' with recommended badge",
-        "PHASE 0 - BOTH: 'Full analysis - backtest + walk-forward'",
-        "PHASE 1 - SELECTED: Selected card gets gold border and background tint",
-        "PHASE 1 - ICON: Add icons - PlayArrow for Backtest, Timeline for WFO, AllInclusive for Both",
-        "PHASE 2 - INTEGRATE: Replace RadioGroup in OptimizationForm/Wizard",
-        "TEST - SELECT: Click Walk-Forward card, verify it selects",
-        "TEST - VISUAL: Selected card clearly highlighted",
-        "VALIDATE - RECOMMENDED: Walk-Forward shows '(recommended)' label",
-        "COMMIT - MSG: git commit -m 'feat(frontend): add optimization type cards'"
-      ],
-      "priority": 12,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P3-TIMEFRAME"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "Feature"
-      ],
-      "context": {
-        "affectedFiles": [
-          "frontend/maestro-ui/src/components/OptimizationTypeSelector.js (new)",
-          "frontend/maestro-ui/src/components/OptimizationWizard.js"
-        ],
-        "types": {
-          "BACKTESTING": "Single pass with fixed parameters",
-          "WALKFORWARD": "Rolling optimization (recommended)",
-          "BOTH": "Full analysis - backtest + walk-forward"
+          "build": "cd /Users/ffv_macmini/Desktop/maestro/frontend/maestro-ui && npm run build",
+          "lint": "cd /Users/ffv_macmini/Desktop/maestro/frontend/maestro-ui && npm run lint -- --max-warnings=0",
+          "grepExport": "grep -n 'handleExport\\|FileDownload' /Users/ffv_macmini/Desktop/maestro/frontend/maestro-ui/src/components/Evaluation.js"
         },
-        "verifyCommands": {
-          "test": "View optimization type selector, click cards to select"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P3-WFO",
-      "title": "UX Phase 3.3: Add Walk-Forward Settings Panel",
-      "description": "[Frontend][UX] Add collapsible panel for Walk-Forward specific settings when WALKFORWARD or BOTH is selected.",
-      "acceptanceCriteria": [
-        "PHASE 0 - CREATE: Create src/components/WalkForwardSettings.js",
-        "PHASE 0 - COLLAPSE: Use MUI Collapse, visible when optType !== 'BACKTESTING'",
-        "PHASE 0 - SPLITS: Number of splits input with helper: 'More splits = more robust but slower'",
-        "PHASE 0 - MODE: Select for mode: Rolling (recommended), Expanding, Adaptive",
-        "PHASE 1 - DESCRIPTIONS: Mode descriptions in FormHelperText",
-        "PHASE 1 - ROLLING: 'Fixed window size slides forward'",
-        "PHASE 1 - EXPANDING: 'Training window grows with each split'",
-        "PHASE 1 - ADAPTIVE: 'Window adjusts based on volatility'",
-        "PHASE 2 - DEFAULTS: Default num_splits=10, mode='rolling'",
-        "PHASE 2 - INTEGRATE: Add to wizard Step 3",
-        "TEST - VISIBLE: Select Walk-Forward, verify panel appears",
-        "TEST - HIDDEN: Select Backtest, verify panel hidden",
-        "TEST - VALUES: Change settings, verify form data updates",
-        "VALIDATE - ANIMATION: Collapse animates smoothly",
-        "COMMIT - MSG: git commit -m 'feat(frontend): add walk-forward settings panel'"
-      ],
-      "priority": 13,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P3-OPTTYPE"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "Feature"
-      ],
-      "context": {
-        "affectedFiles": [
-          "frontend/maestro-ui/src/components/WalkForwardSettings.js (new)",
-          "frontend/maestro-ui/src/components/OptimizationWizard.js"
-        ],
-        "modes": [
-          "rolling",
-          "expanding",
-          "adaptive"
-        ],
-        "verifyCommands": {
-          "test": "Select Walk-Forward, verify settings panel appears"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P4-EMPTY",
-      "title": "UX Phase 4.1: Create Empty State for First-Time Users",
-      "description": "[Frontend][UX] Show welcome empty state when no optimizations exist yet. Guide users to run their first test.",
-      "acceptanceCriteria": [
-        "PHASE 0 - CHECK: In Home, check if any optimization results exist via API",
-        "PHASE 0 - EMPTY: If none, show WelcomeEmptyState instead of dashboard",
-        "PHASE 0 - CREATE: Create src/components/WelcomeEmptyState.js",
-        "PHASE 1 - CONTENT: Show Maestro logo, welcome message, quick start steps",
-        "PHASE 1 - STEPS: 1. Choose data source, 2. Select strategy, 3. Configure and run",
-        "PHASE 1 - CTA: Primary button 'Run First Optimization' opens wizard",
-        "PHASE 2 - ANIMATE: Subtle fade-in animation",
-        "PHASE 2 - ILLUSTRATION: Add chart illustration or icon",
-        "TEST - EMPTY: Clear all results, refresh, verify welcome state shows",
-        "TEST - CTA: Click button, verify wizard opens",
-        "TEST - AFTER: Run optimization, refresh, verify dashboard shows",
-        "VALIDATE - FIRST_TIME: New user experience is clear and welcoming",
-        "COMMIT - MSG: git commit -m 'feat(frontend): add welcome empty state'"
-      ],
-      "priority": 14,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P3-WFO"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "Feature"
-      ],
-      "context": {
-        "affectedFiles": [
-          "frontend/maestro-ui/src/components/WelcomeEmptyState.js (new)",
-          "frontend/maestro-ui/src/components/Home.js"
-        ],
-        "verifyCommands": {
-          "test": "Clear results, refresh, verify welcome empty state"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P4-RESULTS",
-      "title": "UX Phase 4.2: Enhance Results Table with Sorting and Filtering",
-      "description": "[Frontend][UX] Upgrade Results table with sortable columns, strategy filter, and status chips.",
-      "acceptanceCriteria": [
-        "PHASE 0 - READ: Read src/components/OptimizationResults.js current implementation",
-        "PHASE 0 - SORT: Add column header click to sort by: Date, Strategy, Symbol, Sharpe, Status",
-        "PHASE 0 - DIRECTION: Toggle asc/desc with arrow icon indicator",
-        "PHASE 1 - FILTER: Add Autocomplete filter by Strategy name",
-        "PHASE 1 - CHIPS: Status column shows Chip (completed=success, failed=error, running=primary)",
-        "PHASE 1 - FORMAT: Format Sharpe to 2 decimal places, Date to locale string",
-        "PHASE 2 - EMPTY: If no results match filter, show EmptyState with 'No matching results'",
-        "PHASE 2 - PAGINATION: Add TablePagination with 10/25/50 rows per page",
-        "TEST - SORT: Click Sharpe header, verify rows sort descending",
-        "TEST - FILTER: Select 'Ichimoku' filter, verify only Ichimoku results show",
-        "TEST - PAGINATION: Navigate pages, verify correct results show",
-        "VALIDATE - PERFORMANCE: Table handles 100+ rows without lag",
-        "COMMIT - MSG: git commit -m 'feat(frontend): enhance results table'"
-      ],
-      "priority": 15,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P4-EMPTY"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "Feature"
-      ],
-      "context": {
-        "affectedFiles": [
-          "frontend/maestro-ui/src/components/OptimizationResults.js"
-        ],
-        "columns": [
-          "Date",
-          "Test Name",
-          "Strategy",
-          "Symbol",
-          "Timeframe",
-          "Sharpe",
-          "Status"
-        ],
-        "verifyCommands": {
-          "test": "View results, click column headers, verify sorting works"
-        }
-      },
-      "completionNotes": "Completed by agent"
-    },
-    {
-      "id": "MAESTRO-UX-P5-THEME",
-      "title": "UX Phase 5.1: Finalize Dark Theme Styling",
-      "description": "[Frontend][UX] Ensure consistent dark theme across all new components. Use Maestro color palette.",
-      "acceptanceCriteria": [
-        "PHASE 0 - READ: Read src/theme.js or createTheme configuration",
-        "PHASE 0 - PALETTE: Verify palette: primary=#fbbf24 (gold), success=#10b981, error=#ef4444",
-        "PHASE 0 - BACKGROUND: paper=#111111, default=#0a0a0a",
-        "PHASE 0 - BORDER: Consistent border color #222222",
-        "PHASE 1 - AUDIT: Check all new components use theme colors not hardcoded",
-        "PHASE 1 - GLOW: Add box-shadow glow effects on active/hover states",
-        "PHASE 1 - MONO: Use IBM Plex Mono for numbers and code",
-        "PHASE 2 - CARDS: All cards have consistent border-radius (12px) and border",
-        "PHASE 2 - BUTTONS: Primary buttons are gold, secondary are outline",
-        "TEST - VISUAL: Screenshot all pages, verify consistent styling",
-        "TEST - CONTRAST: Verify text readability on dark backgrounds",
-        "VALIDATE - PROFESSIONAL: UI looks like a professional trading platform",
-        "COMMIT - MSG: git commit -m 'style(frontend): finalize dark theme'"
-      ],
-      "priority": 16,
-      "passes": true,
-      "dependsOn": [
-        "MAESTRO-UX-P4-RESULTS"
-      ],
-      "trelloCardId": null,
-      "trelloList": "to-dos",
-      "labels": [
-        "Frontend",
-        "UX",
-        "Styling"
-      ],
-      "context": {
-        "affectedFiles": [
-          "frontend/maestro-ui/src/theme.js",
-          "frontend/maestro-ui/src/App.css"
-        ],
-        "colorPalette": {
-          "primary": "#fbbf24",
-          "success": "#10b981",
-          "error": "#ef4444",
-          "warning": "#f59e0b",
-          "info": "#06b6d4",
-          "background_paper": "#111111",
-          "background_default": "#0a0a0a",
-          "border": "#222222"
-        },
-        "verifyCommands": {
-          "test": "Navigate all pages, verify consistent dark theme"
-        }
-      },
-      "completionNotes": "Completed by agent"
+        "downloadPattern": "const handleExport = async () => { const response = await fetch(`${API_URL}/optimization/results/${tid}/export/csv`); const blob = await response.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${testName}_export.csv`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url); };",
+        "consensusRating": "Depends on MAESTRO-S4-003 (backend endpoint)"
+      }
     }
   ],
   "metadata": {
-    "updatedAt": "2026-02-07T03:31:32.570Z",
+    "updatedAt": "2026-02-13T00:00:00Z",
     "project": "Maestro",
-    "description": "Frontend UX redesign based on comprehensive analysis. Transforms dev prototype into professional quantitative trading platform. 16 user stories across 5 phases: Quick Wins, Dashboard Redesign, Wizard Form, Empty States, Theme Finalization.",
-    "uxAnalysis": "See docs/ux-redesign/03-ux-analysis.md for detailed issue breakdown",
-    "mockups": "See docs/ux-redesign/mockups/hybrid-dashboard.html for visual reference",
-    "implementationPlan": "See docs/ux-redesign/04-implementation-plan.md for phased rollout",
-    "totalStories": 16,
-    "phases": {
-      "P0_QuickWins": 5,
-      "P1_Dashboard": 2,
-      "P2_Wizard": 3,
-      "P3_Components": 3,
-      "P4_EmptyStates": 2,
-      "P5_Theme": 1
+    "workingDirectory": "/Users/ffv_macmini/Desktop/maestro",
+    "frontendPath": "frontend/maestro-ui",
+    "backendPath": "backend/main",
+    "description": "Sprint 4 based on Cross-Agent Consensus Matrix Analysis. 4 specialized agents (Frontend Dev, Quant/Trader, Tech Lead, UX Researcher) evaluated 10 potential improvements.",
+    "consensusSource": "docs/UX_IMPROVEMENT_ROADMAP.md",
+    "executionOrder": [
+      "MAESTRO-S4-001 (Wizard Bug) - P0, no deps, run first",
+      "MAESTRO-S4-002 (Loading States) - P1, no deps, can run parallel",
+      "MAESTRO-S4-003 (Backend Export) - P2, no deps, can run parallel",
+      "MAESTRO-S4-004 (Frontend Export) - P2, depends on S4-003"
+    ],
+    "parallelTasks": ["S4-001", "S4-002", "S4-003"],
+    "previousSprints": {
+      "sprint1_3_completed": 16,
+      "summary": "Bulk select, status filter, accordion sections, tab navigation, equity curve overlay, data validation - all shipped"
     },
-    "realData": {
-      "providers": {
-        "binance": {
-          "symbols": 20,
-          "examples": [
-            "BTCUSDT",
-            "ETHUSDT",
-            "SOLUSDT"
-          ]
-        },
-        "bitmex": {
-          "symbols": 1,
-          "examples": [
-            "XBTUSD"
-          ]
-        },
-        "bybit": {
-          "symbols": 2,
-          "examples": [
-            "MYXUSDT",
-            "RIVERUSDT"
-          ]
-        },
-        "mexc": {
-          "symbols": 5,
-          "examples": [
-            "MYXUSDT",
-            "RAINUSDT",
-            "DSTUSDT"
-          ]
-        },
-        "kucoin": {
-          "symbols": 2,
-          "examples": [
-            "RAINUSDT",
-            "ADIUSDT"
-          ]
-        },
-        "gate": {
-          "symbols": 1,
-          "examples": [
-            "MYXUSDT"
-          ]
-        }
-      },
-      "totalSymbols": 31,
-      "totalStrategies": 65,
-      "strategyCategories": {
-        "technical": 19,
-        "hybrids": 15,
-        "derivatives": 11,
-        "scalping": 8,
-        "momentum": 6,
-        "composite": 6
-      }
+    "skippedItems": {
+      "emptyStates": "Already implemented (EmptyState.js, WelcomeEmptyState.js)",
+      "darkLightToggle": "Low ROI - trading apps use dark mode, 340-line theme.js already cohesive"
     },
-    "trelloCards": {
-      "frontendUXRedesign": {
-        "id": null,
-        "url": null,
-        "name": "[Maestro] Frontend UX Redesign - Professional Trading UI",
-        "list": "To Dos",
-        "status": "pending"
-      }
+    "backlogItems": [
+      "Real-time progress integration (wizard post-submit)",
+      "Error handling improvements (retry actions in toasts)",
+      "Keyboard shortcuts (Ctrl+Enter, Escape)",
+      "Strategy templates expansion",
+      "Mobile responsiveness"
+    ],
+    "trelloCard": {
+      "id": "698f731f10934ad2494fe815",
+      "url": "https://trello.com/c/rqBTcsuo",
+      "name": "[Maestro] UX Sprint 4 - Wizard Bug Fix, Loading States, Export"
     }
   }
 }

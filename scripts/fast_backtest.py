@@ -4,9 +4,14 @@ Fast Backtest - Direct CSV Reading
 
 Reads from CSV files (no RethinkDB overhead) for maximum speed.
 Skips 1m data (too large).
+
+v2.2 - Added position sizing modes:
+  --mode compound  : 100% capital compounding (optimistic, for screening)
+  --mode fixed     : Fixed 10% position size (realistic, matches Freqtrade)
 """
 import sys
 import os
+import argparse
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 import pandas as pd
@@ -22,6 +27,10 @@ from engine.vectorized_backtester import backtest_strategy
 
 DATA_DIR = '/Users/ffv_macmini/Desktop/maestro/data/merged'  # Use merged data with derivatives
 SKIP_PATTERNS = ['_1m.csv', '_5m.csv']  # Skip 1m and 5m (too slow)
+
+# Global config (set from args)
+POSITION_MODE = 'fixed'  # 'compound' or 'fixed'
+POSITION_SIZE = 0.1      # 10% position size for fixed mode
 
 
 def get_csv_files():
@@ -71,7 +80,13 @@ def run_one(args):
         exchange, symbol, timeframe = parse_filename(filepath)
 
         # Pass timeframe explicitly for correct Sharpe annualization
-        result = backtest_strategy(df, module.generate_signals, strategy_name, timeframe=timeframe)
+        # Use global position mode settings for realistic vs optimistic results
+        result = backtest_strategy(
+            df, module.generate_signals, strategy_name,
+            timeframe=timeframe,
+            position_mode=POSITION_MODE,
+            position_size=POSITION_SIZE
+        )
         result['exchange'] = exchange
         result['symbol'] = symbol
         result['timeframe'] = timeframe
@@ -84,11 +99,24 @@ def run_one(args):
 
 
 def main():
+    global POSITION_MODE, POSITION_SIZE
+
+    parser = argparse.ArgumentParser(description='Fast Backtester with Position Sizing')
+    parser.add_argument('--mode', choices=['compound', 'fixed'], default='fixed',
+                        help='Position mode: compound (100%% capital) or fixed (realistic)')
+    parser.add_argument('--size', type=float, default=0.1,
+                        help='Position size fraction for fixed mode (default: 0.1 = 10%%)')
+    args = parser.parse_args()
+
+    POSITION_MODE = args.mode
+    POSITION_SIZE = args.size
+
     print("=" * 70)
     print("MAESTRO FAST BACKTESTER (CSV-direct)")
     print("=" * 70)
     start_time = datetime.now()
     print(f"Started: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"Position Mode: {POSITION_MODE.upper()} ({POSITION_SIZE*100:.0f}% per trade)" if POSITION_MODE == 'fixed' else f"Position Mode: {POSITION_MODE.upper()} (100% compounding)")
 
     # Get files and strategies
     files = get_csv_files()
