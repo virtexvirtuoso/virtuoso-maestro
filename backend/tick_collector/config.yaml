@@ -1,0 +1,20 @@
+# Tick Collector Configuration
+symbols:
+  - BTCUSDT
+  - ETHUSDT
+  - SOLUSDT
+  - LINKUSDT
+
+# Orderbook snapshot interval (seconds)
+orderbook_interval: 1
+
+# L2 depth (levels per side)
+orderbook_depth: 50
+
+# Storage
+data_dir: ./data
+flush_interval: 300  # Write to parquet every 5 min
+
+# Bybit
+testnet: false
+category: linear  # USDT perpetuals

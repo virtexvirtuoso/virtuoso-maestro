@@ -1,0 +1,4 @@
+pybit>=5.8.0
+pandas>=2.0
+pyarrow>=14.0
+pyyaml>=6.0
