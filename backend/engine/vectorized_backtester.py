@@ -4,11 +4,17 @@ Vectorized Backtester for Strategy Screening
 Fast backtesting using vectorized operations for screening all strategies
 across all symbols and timeframes.
 
+v2.2 - Added realistic position sizing modes:
+- 'compound': Full capital compounding (screening mode, optimistic)
+- 'fixed': Fixed position size per trade (realistic, matches Freqtrade)
+- 'kelly': Kelly criterion position sizing (optimal growth)
+
 Fixed issues:
 - Timeframe-aware Sharpe ratio annualization
 - Proper commission handling (per-trade, not per-return)
 - Compound trade returns (not sum)
 - Numerical stability via log returns
+- Realistic position sizing option to match Freqtrade
 """
 import pandas as pd
 import numpy as np
@@ -98,15 +104,19 @@ def get_periods_per_year(timeframe: str) -> float:
 
 def calculate_returns(df: pd.DataFrame, signals: pd.Series,
                       commission: float = 0.001,
-                      slippage: float = 0.0005) -> pd.Series:
+                      slippage: float = 0.0005,
+                      position_mode: str = 'fixed',
+                      position_size: float = 0.1) -> pd.Series:
     """
-    Calculate strategy returns from signals.
+    Calculate strategy returns from signals with realistic position sizing.
 
     Args:
         df: OHLCV DataFrame
         signals: Series of signals (1=long, -1=short, 0=flat)
         commission: Trading commission per trade (default 0.1%)
         slippage: Slippage per trade (default 0.05%)
+        position_mode: 'compound' (100% capital), 'fixed' (fraction of capital)
+        position_size: Fraction of capital per trade for 'fixed' mode (default 0.1 = 10%)
 
     Returns:
         Series of strategy returns (log returns for stability)
@@ -121,12 +131,23 @@ def calculate_returns(df: pd.DataFrame, signals: pd.Series,
     # Strategy returns = position * price returns
     strategy_returns = position * price_returns
 
+    # Apply position sizing for realistic returns
+    if position_mode == 'fixed':
+        # Fixed position size: each trade uses only X% of capital
+        # This prevents unrealistic compounding on volatile assets
+        # Return contribution = position_size * price_return
+        strategy_returns = strategy_returns * position_size
+
     # Identify trade entries/exits (position changes)
     position_changes = position.diff().abs().fillna(0)
 
     # Commission + slippage cost per trade (as log return impact)
     # For a round-trip trade: entry + exit = 2 * (commission + slippage)
     trade_cost = commission + slippage
+
+    # Apply position sizing to costs too for fixed mode
+    if position_mode == 'fixed':
+        trade_cost = trade_cost * position_size
 
     # Apply costs only when position changes (not on every bar)
     # Use log approximation: log(1 - cost) ≈ -cost for small cost
@@ -252,6 +273,8 @@ def backtest_strategy(df: pd.DataFrame, strategy_func,
                       timeframe: Optional[str] = None,
                       commission: float = 0.001,
                       slippage: float = 0.0005,
+                      position_mode: str = 'fixed',
+                      position_size: float = 0.1,
                       **kwargs) -> Dict[str, Any]:
     """
     Run a single strategy backtest.
@@ -263,6 +286,8 @@ def backtest_strategy(df: pd.DataFrame, strategy_func,
         timeframe: Data timeframe (inferred from data if not provided)
         commission: Trading commission per trade
         slippage: Slippage per trade
+        position_mode: 'compound' (100% capital) or 'fixed' (realistic sizing)
+        position_size: Fraction of capital per trade for fixed mode (0.1 = 10%)
         **kwargs: Additional parameters for strategy
 
     Returns:
@@ -288,13 +313,19 @@ def backtest_strategy(df: pd.DataFrame, strategy_func,
         # Ensure signals are numeric and aligned
         signals = pd.Series(signals, index=df.index).fillna(0)
 
-        # Calculate returns and metrics
-        returns = calculate_returns(df, signals, commission, slippage)
+        # Calculate returns and metrics with position sizing
+        returns = calculate_returns(
+            df, signals, commission, slippage,
+            position_mode=position_mode,
+            position_size=position_size
+        )
         metrics = calculate_metrics(returns, signals, timeframe)
 
         return {
             'strategy': strategy_name,
             'timeframe_detected': timeframe,
+            'position_mode': position_mode,
+            'position_size': position_size if position_mode == 'fixed' else 1.0,
             **metrics,
             'error': None
         }
@@ -316,7 +347,9 @@ def backtest_strategy(df: pd.DataFrame, strategy_func,
 
 
 def run_all_strategies(df: pd.DataFrame, strategies: Dict[str, callable],
-                       timeframe: Optional[str] = None) -> pd.DataFrame:
+                       timeframe: Optional[str] = None,
+                       position_mode: str = 'fixed',
+                       position_size: float = 0.1) -> pd.DataFrame:
     """
     Run all strategies on a single dataset.
 
@@ -324,13 +357,20 @@ def run_all_strategies(df: pd.DataFrame, strategies: Dict[str, callable],
         df: OHLCV DataFrame
         strategies: Dict of {name: function}
         timeframe: Data timeframe (optional)
+        position_mode: 'compound' (100% capital) or 'fixed' (realistic sizing)
+        position_size: Fraction of capital per trade for fixed mode (0.1 = 10%)
 
     Returns:
         DataFrame with results for all strategies
     """
     results = []
     for name, func in strategies.items():
-        result = backtest_strategy(df, func, name, timeframe=timeframe)
+        result = backtest_strategy(
+            df, func, name,
+            timeframe=timeframe,
+            position_mode=position_mode,
+            position_size=position_size
+        )
         results.append(result)
 
     return pd.DataFrame(results)

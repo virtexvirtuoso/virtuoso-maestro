@@ -9,3 +9,7 @@ class DataSourceProviders(Enum):
     GATE = 'GATE'
     KUCOIN = 'KUCOIN'
     MEXC = 'MEXC'
+    YFINANCE = 'YFINANCE'
+    FRED = 'FRED'
+    FAMA_FRENCH = 'FAMA_FRENCH'
+    ALPHA_VANTAGE = 'ALPHA_VANTAGE'

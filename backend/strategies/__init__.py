@@ -1,5 +1,5 @@
 """
-Maestro Strategies - 65 Trading Strategies
+Maestro Strategies - 66 Trading Strategies
 
 Categories:
 - technical: 19 strategies (Ichimoku, ADX, MACD, BB, RSI, etc.)
@@ -7,7 +7,7 @@ Categories:
 - momentum: 6 strategies (TSMOM, ATR trend, volatility, etc.)
 - composite: 6 strategies (Fernando, Combined, etc.)
 - derivatives: 11 strategies (OI, CVD, Liquidation, Funding, etc.)
-- hybrids: 15 strategies (combined strategies with filters)
+- hybrids: 16 strategies (combined strategies with filters)
 
 Usage:
     from strategies import list_strategies, run_strategy, summary

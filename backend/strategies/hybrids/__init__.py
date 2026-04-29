@@ -1,1 +1,1 @@
-"""Hybrid Strategies - 15 combination strategies"""
+"""Hybrid Strategies - 16 combination strategies"""
