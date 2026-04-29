@@ -6,7 +6,9 @@ import os
 import time
 from datetime import datetime
 
-API_KEY = '***COINGLASS_KEY_REDACTED***'
+API_KEY = os.environ.get('COINALYZE_API_KEY')
+if not API_KEY:
+    raise RuntimeError('COINALYZE_API_KEY environment variable is required')
 BASE = 'https://api.coinalyze.net/v1'
 OUTPUT = os.path.expanduser('~/Desktop/maestro/data/derivatives')
 os.makedirs(OUTPUT, exist_ok=True)

@@ -18,7 +18,9 @@ import pandas as pd
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-API_KEY = os.environ.get("COINALYZE_API_KEY", "***COINGLASS_KEY_REDACTED***")
+API_KEY = os.environ.get("COINALYZE_API_KEY")
+if not API_KEY:
+    raise RuntimeError("COINALYZE_API_KEY environment variable is required")
 BASE_URL = "https://api.coinalyze.net/v1"
 
 # Match our spot data assets + derivatives-only assets
