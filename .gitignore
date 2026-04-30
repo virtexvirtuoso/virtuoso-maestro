@@ -192,3 +192,8 @@ backend/deployment/
 
 # .gitignore backups created during cleanup runs
 .gitignore.bak.*
+
+# Local data, do not commit
+data/
+archive/
+optuna_studies.db
