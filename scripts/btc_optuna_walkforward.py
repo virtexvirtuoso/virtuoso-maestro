@@ -23,6 +23,7 @@ import pandas as pd
 
 from engine_v2.strategy_adapter import SignalOutput, VectorBTStrategy
 from engine_v2.walk_forward_optuna import WalkForwardConfig, WalkForwardOptuna
+from engine_v2.parallel_walk_forward import ParallelWalkForward, ParallelConfig
 from engine_v2.vectorbt_engine import BacktestConfig
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -357,6 +358,8 @@ def run_walkforward_optimization(
         pruning_enabled=True,
         n_startup_trials=10,
         use_dashboard_storage=True,
+        strategy_name=strategy_name,
+        asset='BTC',
     )
 
     backtest_config = BacktestConfig(
@@ -365,11 +368,12 @@ def run_walkforward_optimization(
         slippage=0.0005,
     )
 
-    engine = WalkForwardOptuna(
+    engine = ParallelWalkForward(
         data=data,
         strategy=strategy,
         config=config,
         backtest_config=backtest_config,
+        parallel_config=ParallelConfig(enabled=True),
         logger=logger,
     )
 

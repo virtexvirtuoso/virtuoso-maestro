@@ -67,6 +67,17 @@ def get_storage_url(db_path: str | None = None) -> str:
     return f"sqlite:///{path}"
 
 
+def _enable_wal_mode(db_path: str) -> None:
+    """Enable WAL journal mode on SQLite DB for safe concurrent writes (Phase 1)."""
+    import sqlite3
+    try:
+        conn = sqlite3.connect(db_path)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.close()
+    except Exception:
+        pass  # Best-effort — DB may not exist yet
+
+
 class OptunaDashboardStorage:
     """
     Manages Optuna study storage with dashboard support.
@@ -263,12 +274,14 @@ def create_study_with_dashboard(
     load_if_exists: bool = True,
     sampler: optuna.samplers.BaseSampler | None = None,
     pruner: optuna.pruners.BasePruner | None = None,
+    study_name_override: str | None = None,
 ) -> optuna.Study:
     """
     Create an Optuna study with dashboard-compatible SQLite storage.
 
-    This is a convenience function that creates a study with the
-    Maestro naming convention (maestro_fold_{fold_idx}).
+    Study naming convention (Phase 1):
+        maestro_{strategy}_{asset}_fold_{n}
+    Falls back to maestro_fold_{n} if no override provided.
 
     Args:
         fold_idx: Fold index for study naming
@@ -277,28 +290,23 @@ def create_study_with_dashboard(
         load_if_exists: If True, load existing study for warm-starting.
         sampler: Optuna sampler. Defaults to TPESampler.
         pruner: Optuna pruner. Defaults to MedianPruner.
+        study_name_override: Full study name (overrides default naming).
 
     Returns:
         optuna.Study instance with SQLite storage
-
-    Example:
-        study = create_study_with_dashboard(fold_idx=0)
-        study.optimize(objective, n_trials=100)
-
-        # View in dashboard:
-        # optuna-dashboard sqlite:///data/optuna_studies.db --port 8050
     """
     # Determine storage URL
     if storage_url is None:
         storage_url = get_storage_url()
 
-    # Ensure directory exists for default path
+    # Ensure directory exists and enable WAL mode for concurrent writes (Phase 1)
     if storage_url.startswith("sqlite:///"):
         db_path = storage_url[len("sqlite:///"):]
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+        _enable_wal_mode(db_path)
 
-    # Generate study name
-    study_name = f"{OptunaDashboardStorage.STUDY_PREFIX}{fold_idx}"
+    # Generate study name — use override if provided (Phase 1 naming)
+    study_name = study_name_override or f"{OptunaDashboardStorage.STUDY_PREFIX}{fold_idx}"
 
     # Default sampler with reproducible seed
     if sampler is None:

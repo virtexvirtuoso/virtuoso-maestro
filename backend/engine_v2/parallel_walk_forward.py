@@ -38,6 +38,9 @@ from engine_v2.walk_forward_optuna import (
     WalkForwardConfig,
     WalkForwardResult,
     OptimizationType,
+    compute_adaptive_n_trials,
+    _EarlyStoppingCallback,
+    select_sampler,
 )
 from utils.time_series_split_rolling import TimeSeriesSplitRolling, WindowMode
 
@@ -120,8 +123,33 @@ def _optimize_fold(
         try:
             result = _backtest_with_params(train_data, strategy, params, backtest_config)
 
+            sharpe = result.sharpe_ratio if not pd.isna(result.sharpe_ratio) else 0.0
+
+            # Phase 4: Progressive checkpoint pruning
+            if result.returns is not None and len(result.returns) >= 6:
+                returns = result.returns.dropna()
+                n = len(returns)
+                for step, frac in enumerate([1/3, 2/3, 1.0]):
+                    end = max(2, int(n * frac))
+                    slice_returns = returns.iloc[:end]
+                    mean_r = slice_returns.mean()
+                    std_r = slice_returns.std()
+                    partial_sharpe = (mean_r / std_r * np.sqrt(365)) if std_r > 1e-10 else 0.0
+                    if pd.isna(partial_sharpe) or np.isinf(partial_sharpe):
+                        partial_sharpe = 0.0
+                    trial.report(partial_sharpe, step=step)
+                    if trial.should_prune():
+                        raise optuna.TrialPruned()
+            else:
+                total_return = result.total_return if not pd.isna(result.total_return) else 0.0
+                trial.report(total_return, step=0)
+                if trial.should_prune():
+                    raise optuna.TrialPruned()
+                trial.report(sharpe, step=1)
+                if trial.should_prune():
+                    raise optuna.TrialPruned()
+
             if config.use_vwr_ranking:
-                sharpe = result.sharpe_ratio if not pd.isna(result.sharpe_ratio) else 0.0
                 vwr = result.vwr if not pd.isna(result.vwr) else 0.0
                 metric = sharpe + (vwr * 0.001)
             else:
@@ -132,11 +160,18 @@ def _optimize_fold(
 
             return metric
 
+        except optuna.TrialPruned:
+            raise
         except Exception:
             return float('-inf')
 
-    # Create Optuna study
-    sampler = TPESampler(seed=42 + fold_idx)
+    # Build study name: maestro_{strategy}_{asset}_fold_{n} (Phase 1)
+    strategy_tag = config.strategy_name or strategy.__class__.__name__
+    asset_tag = config.asset or 'unknown'
+    study_name = f"maestro_{strategy_tag}_{asset_tag}_fold_{fold_idx}"
+
+    # Phase 5: Auto-select sampler based on param space types
+    sampler = select_sampler(param_space, fold_idx, config.n_startup_trials)
     pruner = MedianPruner(n_startup_trials=config.n_startup_trials) if config.pruning_enabled else None
 
     if config.use_dashboard_storage:
@@ -148,22 +183,51 @@ def _optimize_fold(
             load_if_exists=True,
             sampler=sampler,
             pruner=pruner,
+            study_name_override=study_name,
         )
     else:
         study = optuna.create_study(
             direction='maximize',
             sampler=sampler,
             pruner=pruner,
-            study_name=f"fold_{fold_idx}"
+            study_name=study_name,
         )
+
+    # Phase 6.2: Dashboard metadata
+    study.set_user_attr("strategy", strategy_tag)
+    study.set_user_attr("asset", asset_tag)
+    study.set_user_attr("fold", fold_idx)
+    study.set_user_attr("n_params", len(param_space))
+
+    # Phase 3: Cross-asset warm-starting
+    if config.use_dashboard_storage and config.asset:
+        try:
+            from engine_v2.cross_asset_warmer import CrossAssetWarmer
+            warmer = CrossAssetWarmer(
+                storage_url=config.storage_url or get_storage_url(),
+            )
+            warmer.seed_study(study, strategy_tag, config.asset)
+        except Exception:
+            pass  # Best-effort in subprocess
 
     optuna.logging.set_verbosity(optuna.logging.WARNING)
 
+    # Phase 2.1: Adaptive trial count
+    effective_n_trials = compute_adaptive_n_trials(
+        param_space, config.n_trials, config.auto_n_trials
+    )
+
+    # Phase 2.2: Early stopping callback
+    callbacks = []
+    if config.early_stopping_rounds > 0:
+        callbacks.append(_EarlyStoppingCallback(patience=config.early_stopping_rounds))
+
     study.optimize(
         objective,
-        n_trials=config.n_trials,
+        n_trials=effective_n_trials,
         n_jobs=config.n_jobs,
         show_progress_bar=False,
+        callbacks=callbacks or None,
     )
 
     if study.best_trial:
@@ -408,6 +472,13 @@ class ParallelWalkForward:
         # Combine equity curves
         self._result.combined_equity_curve = self._combine_equity_curves(fold_results)
 
+        # Phase 1: failure monitoring
+        if self._result.has_failures:
+            self.logger.warning(
+                f"Walk-forward has {self._result.failed_fold_count}/{len(fold_results)} "
+                f"failed folds (no trades + zero sharpe). Results may be unreliable."
+            )
+
         self._update_progress(f"Walk-forward complete: {len(fold_results)} folds in {processing_time:.2f}s")
         self.logger.info(
             f"Parallel walk-forward completed in {processing_time:.2f}s "
@@ -482,6 +553,8 @@ def run_parallel_walkforward(
     cash: float = 100000.0,
     commission: float = 0.001,
     max_workers: int = None,
+    strategy_name: str = '',
+    asset: str = '',
 ) -> WalkForwardResult:
     """
     Convenience function to run parallel walk-forward optimization with sensible defaults.
@@ -496,6 +569,8 @@ def run_parallel_walkforward(
         cash: Initial cash
         commission: Commission rate
         max_workers: Number of parallel workers (None = auto)
+        strategy_name: Strategy identifier for study naming
+        asset: Asset identifier for study naming
 
     Returns:
         WalkForwardResult
@@ -510,6 +585,8 @@ def run_parallel_walkforward(
         train_splits=train_splits,
         test_splits=test_splits,
         n_trials=n_trials,
+        strategy_name=strategy_name,
+        asset=asset,
     )
 
     backtest_config = BacktestConfig(
