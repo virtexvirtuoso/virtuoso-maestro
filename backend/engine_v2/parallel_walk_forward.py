@@ -552,6 +552,7 @@ def run_parallel_walkforward(
     n_trials: int = 50,
     cash: float = 100000.0,
     commission: float = 0.001,
+    slippage: float = 0.0005,
     max_workers: int = None,
     strategy_name: str = '',
     asset: str = '',
@@ -567,7 +568,8 @@ def run_parallel_walkforward(
         test_splits: Number of folds for test window
         n_trials: Optuna trials per split
         cash: Initial cash
-        commission: Commission rate
+        commission: Commission rate (per-trade fee, e.g. 0.001 = 10bps)
+        slippage: Per-trade slippage (e.g. 0.0005 = 5bps); alt-coin realism floor
         max_workers: Number of parallel workers (None = auto)
         strategy_name: Strategy identifier for study naming
         asset: Asset identifier for study naming
@@ -592,6 +594,7 @@ def run_parallel_walkforward(
     backtest_config = BacktestConfig(
         cash=cash,
         commission=commission,
+        slippage=slippage,
     )
 
     parallel_config = ParallelConfig(
