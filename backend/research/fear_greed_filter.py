@@ -25,7 +25,7 @@ ASSETS = ["btc", "eth", "sol", "link", "avax", "sui", "inj", "arb", "op", "rende
 
 def load_fear_greed():
     """Fetch F&G from CoinGlass and return daily Series."""
-    headers = {"CG-API-KEY": "***REMOVED***"}
+    headers = {"CG-API-KEY": os.environ["COINGLASS_API_KEY"]}
     r = requests.get("https://open-api-v4.coinglass.com/api/index/fear-greed-history",
                      headers=headers, params={"limit": 3000})
     data = r.json()["data"]

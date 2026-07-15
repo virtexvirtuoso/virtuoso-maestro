@@ -30,7 +30,7 @@ con.close()
 
 # Fear & Greed from API (already fetched)
 import subprocess, json as _json
-resp = subprocess.run(['curl', '-s', '-H', 'CG-API-KEY: ***REMOVED***',
+resp = subprocess.run(['curl', '-s', '-H', "CG-API-KEY: " + os.environ["COINGLASS_API_KEY"],
     'https://open-api-v4.coinglass.com/api/index/fear-greed-history?limit=1000'],
     capture_output=True, text=True)
 fg_raw = _json.loads(resp.stdout)['data']
