@@ -126,6 +126,7 @@ class WalkForwardResult:
             self.has_failures = self.failed_fold_count > len(self.fold_results) / 2
             # Safe extraction with defaults for empty lists
             sharpe_values = [r.sharpe_ratio for r in self.fold_results if r.sharpe_ratio is not None]
+            sharpe_gross_values = [r.sharpe_gross for r in self.fold_results if getattr(r, 'sharpe_gross', None) is not None]
             vwr_values = [r.vwr for r in self.fold_results if r.vwr is not None]
             win_rate_values = [r.win_rate for r in self.fold_results if r.win_rate is not None]
             drawdown_values = [r.max_drawdown for r in self.fold_results if r.max_drawdown is not None]
@@ -133,6 +134,7 @@ class WalkForwardResult:
             self.aggregate_metrics = {
                 'total_return': sum(r.total_return for r in self.fold_results),
                 'avg_sharpe': np.mean(sharpe_values) if sharpe_values else 0.0,
+                'avg_sharpe_gross': np.mean(sharpe_gross_values) if sharpe_gross_values else 0.0,
                 'avg_vwr': np.mean(vwr_values) if vwr_values else 0.0,
                 'avg_win_rate': np.mean(win_rate_values) if win_rate_values else 0.0,
                 'total_trades': sum(r.num_trades for r in self.fold_results),
@@ -358,7 +360,7 @@ class WalkForwardOptuna(Thread):
                 fold_results.append(test_result)
 
                 self.logger.info(
-                    f"Fold {fold_idx} result: Sharpe={test_result.sharpe_ratio:.3f}, "
+                    f"Fold {fold_idx} result: Sharpe={test_result.sharpe_ratio:.3f} (gross {test_result.sharpe_gross:.3f}), "
                     f"Return={test_result.total_return:.2%}, Trades={test_result.num_trades}"
                 )
 
