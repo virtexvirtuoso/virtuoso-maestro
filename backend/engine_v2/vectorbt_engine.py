@@ -101,6 +101,7 @@ class BacktestResult:
     calmar_ratio: float
     sortino_ratio: float
     vwr: float = 0.0  # Variability-Weighted Return
+    sharpe_gross: float = 0.0  # Sharpe with fees=0, slippage=0 (A3); 0.0 = not computed
 
     # Detailed data
     equity_curve: pd.Series = field(default=None)
@@ -182,39 +183,64 @@ class VectorBTEngine:
         if self.config.allow_short and short_entries is not None:
             short_entries = short_entries.reindex(data.index).fillna(False).astype(bool)
             short_exits = short_exits.reindex(data.index).fillna(False).astype(bool)
-            
+
+        pf = self._build_portfolio(
+            close, entries, exits, short_entries, short_exits,
+            fees=self.config.commission, slippage=self.config.slippage,
+        )
+
+        self._portfolio = pf
+        processing_time = (datetime.utcnow() - start_time).total_seconds()
+
+        result = self._extract_results(pf, parameters or {}, processing_time)
+
+        # A3: gross Sharpe = same signals, zero costs. Optuna keeps optimizing
+        # on net (result.sharpe_ratio); gross is reporting-layer only.
+        if self.config.commission == 0 and self.config.slippage == 0:
+            result.sharpe_gross = result.sharpe_ratio
+        else:
+            pf_gross = self._build_portfolio(
+                close, entries, exits, short_entries, short_exits,
+                fees=0.0, slippage=0.0,
+            )
+            try:
+                val = pf_gross.sharpe_ratio()
+                result.sharpe_gross = 0.0 if pd.isna(val) or np.isinf(val) else float(val)
+            except Exception:
+                result.sharpe_gross = 0.0
+
+        return result
+
+    def _build_portfolio(self, close, entries, exits, short_entries, short_exits,
+                         fees: float, slippage: float):
+        """Single from_signals call site; signals must already be aligned/bool."""
+        if self.config.allow_short and short_entries is not None:
             # Create combined portfolio with longs and shorts
-            pf = vbt.Portfolio.from_signals(
+            return vbt.Portfolio.from_signals(
                 close=close,
                 entries=entries,
                 exits=exits,
                 short_entries=short_entries,
                 short_exits=short_exits,
                 init_cash=self.config.cash,
-                fees=self.config.commission,
-                slippage=self.config.slippage,
+                fees=fees,
+                slippage=slippage,
                 size=self.config.size,
                 size_type='percent' if self.config.size_type == 'percent' else 'amount',
                 freq=self.config.freq,
             )
-        else:
-            # Long-only portfolio
-            pf = vbt.Portfolio.from_signals(
-                close=close,
-                entries=entries,
-                exits=exits,
-                init_cash=self.config.cash,
-                fees=self.config.commission,
-                slippage=self.config.slippage,
-                size=self.config.size,
-                size_type='percent' if self.config.size_type == 'percent' else 'amount',
-                freq=self.config.freq,
-            )
-        
-        self._portfolio = pf
-        processing_time = (datetime.utcnow() - start_time).total_seconds()
-        
-        return self._extract_results(pf, parameters or {}, processing_time)
+        # Long-only portfolio
+        return vbt.Portfolio.from_signals(
+            close=close,
+            entries=entries,
+            exits=exits,
+            init_cash=self.config.cash,
+            fees=fees,
+            slippage=slippage,
+            size=self.config.size,
+            size_type='percent' if self.config.size_type == 'percent' else 'amount',
+            freq=self.config.freq,
+        )
     
     def run_multi(
         self,
